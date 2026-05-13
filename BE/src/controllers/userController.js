@@ -6,6 +6,7 @@ import {
     getUserById,
     getUserByUsernameOrEmail,
     checkExistingUsername,
+    checkExistingEmail,
     createUser,
     updateUser,
     deleteUser
@@ -16,18 +17,38 @@ import {
 export const register = async (req, res) => {
 
     try {
+
         const {
             fullname,
             username,
             email,
-            password, role
+            password
         } = req.body;
 
-        // Validate
+        // Validate empty
         if (!fullname || !username || !email || !password) {
+
             return res.status(400).json({
                 success: false,
                 message: "Please fill all fields"
+            });
+        }
+
+        // Validate email
+        if (!validator.isEmail(email)) {
+
+            return res.status(400).json({
+                success: false,
+                message: "Invalid email"
+            });
+        }
+
+        // Validate password
+        if (password.length < 6) {
+
+            return res.status(400).json({
+                success: false,
+                message: "Password must be at least 6 characters"
             });
         }
 
@@ -36,6 +57,7 @@ export const register = async (req, res) => {
             await checkExistingUsername(username);
 
         if (existingUsername) {
+
             return res.status(409).json({
                 success: false,
                 message: "Username already exists"
@@ -44,9 +66,10 @@ export const register = async (req, res) => {
 
         // Check email
         const existingEmail =
-            await getUserByUsernameOrEmail(email);
+            await checkExistingEmail(email);
 
         if (existingEmail) {
+
             return res.status(409).json({
                 success: false,
                 message: "Email already exists"
@@ -59,17 +82,22 @@ export const register = async (req, res) => {
 
         // Create user
         const user = await createUser({
+
             fullname,
             username,
             email,
             password: hashedPassword,
-            role: role || "user"
+
+            // Không cho client tự set admin
+            role: "user"
         });
 
         // Response
         res.status(201).json({
+
             success: true,
             message: "Register success",
+
             user: {
                 id: user._id,
                 fullname: user.fullname,

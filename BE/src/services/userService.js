@@ -4,7 +4,7 @@ import bcrypt from "bcrypt";
 
 // GET ALL
 const getAllUsers = async () => {
-    return await User.find();
+    return await User.find().select("-password");
 };
 
 
