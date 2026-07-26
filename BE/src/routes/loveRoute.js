@@ -1,5 +1,5 @@
 import express from "express";
-
+import upload from "../middleware/upload.js";
 import {
     createLove,
     getAllLove,
@@ -7,7 +7,7 @@ import {
     updateLove,
     deleteLove,
     verifyPin,
-    increaseViews
+    increaseViews,
 } from "../controllers/loveController.js";
 
 import {
@@ -33,11 +33,28 @@ router.get(
     getAllLove
 );
 
-router.post("/", verifyToken, createLove);
+router.post(
+    "/",
+    verifyToken,
+    upload.fields([
+        { name: "images", maxCount: 10 },
+        { name: "music", maxCount: 1 }
+    ]),
+    createLove
+);
 
-router.put("/:id", verifyToken, updateLove);
+router.put(
+    "/:id",
+    verifyToken,
+    upload.fields([
+        { name: "images", maxCount: 10 },
+        { name: "music", maxCount: 1 }
+    ]),
+    updateLove
+);
 
 router.delete("/:id", verifyToken, deleteLove);
+
 
 
 export default router;

@@ -15,9 +15,7 @@ import {
 
 // REGISTER
 export const register = async (req, res) => {
-
     try {
-
         const {
             fullname,
             username,
@@ -27,7 +25,6 @@ export const register = async (req, res) => {
 
         // Validate empty
         if (!fullname || !username || !email || !password) {
-
             return res.status(400).json({
                 success: false,
                 message: "Please fill all fields"
@@ -36,7 +33,6 @@ export const register = async (req, res) => {
 
         // Validate email
         if (!validator.isEmail(email)) {
-
             return res.status(400).json({
                 success: false,
                 message: "Invalid email"
@@ -45,7 +41,6 @@ export const register = async (req, res) => {
 
         // Validate password
         if (password.length < 6) {
-
             return res.status(400).json({
                 success: false,
                 message: "Password must be at least 6 characters"
@@ -55,9 +50,7 @@ export const register = async (req, res) => {
         // Check username
         const existingUsername =
             await checkExistingUsername(username);
-
         if (existingUsername) {
-
             return res.status(409).json({
                 success: false,
                 message: "Username already exists"
@@ -67,9 +60,7 @@ export const register = async (req, res) => {
         // Check email
         const existingEmail =
             await checkExistingEmail(email);
-
         if (existingEmail) {
-
             return res.status(409).json({
                 success: false,
                 message: "Email already exists"
@@ -82,22 +73,18 @@ export const register = async (req, res) => {
 
         // Create user
         const user = await createUser({
-
             fullname,
             username,
             email,
             password: hashedPassword,
-
             // Không cho client tự set admin
             role: "user"
         });
 
         // Response
         res.status(201).json({
-
             success: true,
             message: "Register success",
-
             user: {
                 id: user._id,
                 fullname: user.fullname,
@@ -106,9 +93,7 @@ export const register = async (req, res) => {
                 role: user.role
             }
         });
-
     } catch (error) {
-
         res.status(500).json({
             success: false,
             message: error.message
@@ -119,9 +104,7 @@ export const register = async (req, res) => {
 
 // LOGIN
 export const login = async (req, res) => {
-
     try {
-
         // Đổi tên biến
         const {
             usernameOrEmail,
@@ -181,7 +164,6 @@ export const login = async (req, res) => {
             success: true,
             message: "Login success",
             token,
-
             user: {
                 id: user._id,
                 fullname: user.fullname,
@@ -202,18 +184,13 @@ export const login = async (req, res) => {
 
 // GET ALL USERS (ADMIN)
 export const index = async (req, res) => {
-
     try {
-
         const users = await getAllUsers();
-
         res.status(200).json({
             success: true,
             users
         });
-
     } catch (error) {
-
         res.status(500).json({
             success: false,
             message: error.message
@@ -224,25 +201,19 @@ export const index = async (req, res) => {
 
 // DELETE USER
 export const removeUser = async (req, res) => {
-
     try {
-
         const deleted = await deleteUser(req.params.id);
-
         if (!deleted) {
             return res.status(404).json({
                 success: false,
                 message: "User not found"
             });
         }
-
         res.status(200).json({
             success: true,
             message: "Delete success"
         });
-
     } catch (error) {
-
         res.status(500).json({
             success: false,
             message: error.message

@@ -1,10 +1,31 @@
 import Love from "../models/love.js";
 import bcrypt from "bcrypt";
+import mongoose from "mongoose";
+import fs from "fs";
+import path from "path";
+
+
+const deleteFileByUrl = (url) => {
+    if (!url) return;
+    try {
+        const filename = url.substring(url.lastIndexOf("/") + 1);
+        const filePath = path.join("uploads", filename);
+        if (fs.existsSync(filePath)) {
+            fs.unlink(filePath, (err) => {
+                if (err) console.error(`[Cleanup] Lỗi khi xóa file ${filePath}:`, err);
+                else console.log(`[Cleanup] Đã xóa file ${filePath} thành công`);
+            });
+        }
+    } catch (error) {
+        console.error("[Cleanup] Lỗi khi xóa file bằng URL:", error);
+    }
+};
 
 
 // CREATE
-const createLoveService = async (userId, data) => {
-
+const createLoveService = async (
+    userId,
+    data) => {
     const {
         title,
         pin,
@@ -14,65 +35,66 @@ const createLoveService = async (userId, data) => {
 
     // Validate
     if (!title || !pin) {
-        throw new Error("Title và PIN là bắt buộc");
+        throw new Error(
+            "Title và PIN là bắt buộc"
+        );
     }
 
-    // Kiểm tra độ dài PIN
-    if (pin.length < 4) {
-        throw new Error("PIN phải từ 4 ký tự");
+    // Validate PIN
+    if (String(pin).length < 4) {
+        throw new Error(
+            "PIN phải từ 4 ký tự"
+        );
     }
 
     // Random slug
     let slug;
     let existingSlug;
-
     do {
-
         slug = Math.random()
             .toString(36)
             .substring(2, 8);
-
-        existingSlug = await Love.findOne({ slug });
-
+        existingSlug =
+            await Love.findOne({ slug });
     } while (existingSlug);
 
-    // Hash pin
-    const pinHash = await bcrypt.hash(pin, 10);
+    // Hash PIN
+    const pinHash = await bcrypt.hash(String(pin), 10);
 
     // Create page
     const page = await Love.create({
-
-        userId: userId,
-
-        title: title.trim(),
-
+        userId,
+        title: String(title).trim(),
         slug,
-
         pinHash,
-
         theme,
-
         content: {
-            messages: content.messages || [],
-            images: content.images || [],
-            music: content.music || ""
+            messages:
+                content.messages ?? [],
+            images:
+                content.images ?? [],
+            music:
+                content.music ?? "",
+            recipient:
+                content.recipient ?? "",
+            occasion:
+                content.occasion ?? ""
         }
     });
-
     return page;
 };
 
 
 // GET ALL
-const getAllLoveService = async () => {
-
-    const data = await Love.find()
+const getAllLoveService = async (
+    userId
+) => {
+    return await Love.find({
+        userId
+    })
         .select("-pinHash")
         .sort({ createdAt: -1 });
-
-    return data;
 };
-
 
 // GET BY SLUG
 const getLoveBySlugService = async (slug) => {
@@ -94,8 +116,17 @@ const updateLoveService = async (
     const {
         title,
         theme,
-        content
+        content,
+        pin
     } = data;
+
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        return {
+            status: 400,
+            message: "ID không hợp lệ"
+        };
+    }
 
     // Tìm page
     const page = await Love.findById(id);
@@ -121,17 +152,42 @@ const updateLoveService = async (
 
     page.theme = theme || page.theme;
 
+    if (pin) {
+        if (String(pin).length < 4) {
+            throw new Error("PIN phải từ 4 ký tự");
+        }
+        page.pinHash = await bcrypt.hash(String(pin), 10);
+    }
+
     if (content) {
+        // Compare and delete removed images from disk
+        if (content.images !== undefined) {
+            const oldImages = page.content.images || [];
+            const newImages = content.images || [];
+            const deletedImages = oldImages.filter(img => !newImages.includes(img));
+            deletedImages.forEach(img => deleteFileByUrl(img));
+            page.content.images = newImages;
+        }
 
-        page.content.messages =
-            content.messages || page.content.messages;
+        // Compare and delete removed music from disk
+        if (content.music !== undefined) {
+            const oldMusic = page.content.music;
+            const newMusic = content.music;
+            if (oldMusic && oldMusic !== newMusic) {
+                deleteFileByUrl(oldMusic);
+            }
+            page.content.music = newMusic;
+        }
 
+        if (content.messages !== undefined) {
+            page.content.messages = content.messages;
+        }
 
-        page.content.images =
-            content.images || page.content.images;
+        page.content.recipient =
+            content.recipient !== undefined ? content.recipient : page.content.recipient;
 
-        page.content.music =
-            content.music || page.content.music;
+        page.content.occasion =
+            content.occasion !== undefined ? content.occasion : page.content.occasion;
     }
 
     // Save DB
@@ -145,17 +201,53 @@ const updateLoveService = async (
 
 
 // DELETE
-const deleteLoveService = async (id) => {
-
-    const page = await Love.findById(id);
-
-    if (!page) {
-        return null;
+const deleteLoveService = async (
+    id,
+    userId) => {
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        return {
+            status: 400,
+            message: "ID không hợp lệ"
+        };
     }
 
-    await page.deleteOne();
+    // Tìm page
+    const page = await Love.findById(id);
+    // Không tồn tại
+    if (!page) {
+        return {
+            status: 404,
+            message: "Không tìm thấy trang"
+        };
+    }
 
-    return page;
+    // Không phải chủ sở hữu
+    if (
+        page.userId.toString() !== userId
+    ) {
+        return {
+            status: 403,
+            message:
+                "Bạn không có quyền xóa trang này"
+        };
+    }
+
+    // Xóa tất cả ảnh của page trên disk
+    if (page.content && page.content.images) {
+        page.content.images.forEach(img => deleteFileByUrl(img));
+    }
+    // Xóa nhạc của page trên disk
+    if (page.content && page.content.music) {
+        deleteFileByUrl(page.content.music);
+    }
+
+    // Xóa page
+    await page.deleteOne();
+    return {
+        status: 200,
+        message: "Xóa thành công"
+    };
 };
 
 

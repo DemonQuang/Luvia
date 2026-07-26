@@ -7,36 +7,52 @@ import {
     verifyPinService,
     increaseViewsService
 } from "../services/loveService.js";
-
+import jwt from "jsonwebtoken";
 
 // CREATE
 const createLove = async (req, res) => {
     try {
 
+        const imageUrls =
+            req.files?.images?.map(
+                (file) =>
+                    `${process.env.BASE_URL}/uploads/${file.filename}`
+            ) || [];
+
+        const musicUrl =
+            req.files?.music?.[0]
+                ? `${process.env.BASE_URL}/uploads/${req.files.music[0].filename}`
+                : "";
+
+        let content = {};
+        try {
+            if (req.body.content) {
+                content = JSON.parse(req.body.content);
+            }
+        } catch {
+            return res.status(400).json({
+                success: false,
+                message: "Content JSON không hợp lệ"
+            });
+        }
+        content.images = imageUrls;
+        content.music = musicUrl;
+        const data = {
+            ...req.body,
+            content
+        };
         const page = await createLoveService(
             req.user.id,
-            req.body
+            data
         );
-
         res.status(201).json({
             success: true,
             message: "Tạo trang thành công",
-
-            data: {
-                _id: page._id,
-                title: page.title,
-                slug: page.slug,
-                theme: page.theme,
-                content: page.content,
-                views: page.views,
-                createdAt: page.createdAt
-            }
+            data: page
         });
 
     } catch (error) {
-
         console.error("Create Love Error:", error);
-
         res.status(500).json({
             success: false,
             message: error.message
@@ -49,7 +65,7 @@ const createLove = async (req, res) => {
 const getAllLove = async (req, res) => {
     try {
 
-        const data = await getAllLoveService();
+        const data = await getAllLoveService(req.user.id);
 
         res.status(200).json({
             success: true,
@@ -72,12 +88,65 @@ const getAllLove = async (req, res) => {
 
 // GET BY SLUG
 const getLoveBySlug = async (req, res) => {
+
     try {
 
         const { slug } = req.params;
 
-        const page = await getLoveBySlugService(slug);
+        // Lấy token
+        const authHeader =
+            req.headers.authorization;
 
+        // Không có token
+        if (
+            !authHeader ||
+            !authHeader.startsWith("Bearer ")
+        ) {
+
+            return res.status(401).json({
+                success: false,
+                message: "PIN required"
+            });
+        }
+
+        // Tách token
+        const token =
+            authHeader.split(" ")[1];
+
+        let decoded;
+
+        try {
+
+            decoded = jwt.verify(
+                token,
+                process.env.JWT_SECRET
+            );
+
+        } catch {
+
+            return res.status(401).json({
+                success: false,
+                message: "Token không hợp lệ"
+            });
+        }
+
+        // Check slug đúng không
+        console.log("[DEBUG] getLoveBySlug -> decoded:", decoded);
+        console.log("[DEBUG] getLoveBySlug -> params slug:", slug);
+        console.log("[DEBUG] getLoveBySlug -> comparison:", decoded.slug === slug);
+        if (decoded.slug !== slug) {
+
+            return res.status(403).json({
+                success: false,
+                message: "Không có quyền truy cập"
+            });
+        }
+
+        // Lấy page
+        const page =
+            await getLoveBySlugService(slug);
+
+        // Không có page
         if (!page) {
             return res.status(404).json({
                 success: false,
@@ -85,6 +154,7 @@ const getLoveBySlug = async (req, res) => {
             });
         }
 
+        // Success
         res.status(200).json({
             success: true,
             data: page
@@ -92,7 +162,10 @@ const getLoveBySlug = async (req, res) => {
 
     } catch (error) {
 
-        console.error("Get Love By Slug Error:", error);
+        console.error(
+            "Get Love By Slug Error:",
+            error
+        );
 
         res.status(500).json({
             success: false,
@@ -107,10 +180,47 @@ const updateLove = async (req, res) => {
 
     try {
 
+        const imageUrls =
+            req.files?.images?.map(
+                (file) =>
+                    `${process.env.BASE_URL}/uploads/${file.filename}`
+            ) || [];
+
+        const musicUrl =
+            req.files?.music?.[0]
+                ? `${process.env.BASE_URL}/uploads/${req.files.music[0].filename}`
+                : "";
+
+        let content;
+        try {
+            if (req.body.content) {
+                content = JSON.parse(req.body.content);
+            }
+        } catch {
+            return res.status(400).json({
+                success: false,
+                message: "Content JSON không hợp lệ"
+            });
+        }
+
+        if (!content) {
+            content = {};
+        }
+
+        // Combine existing images (that were kept) and new images (that were uploaded)
+        const existingImages = content.existingImages || [];
+        content.images = [...existingImages, ...imageUrls];
+
+        // Combine music: use newly uploaded music if available, otherwise fallback to existing music
+        const existingMusic = content.existingMusic || "";
+        content.music = musicUrl || existingMusic;
+
+        const data = { ...req.body, content };
+
         const result = await updateLoveService(
             req.params.id,
             req.user.id,
-            req.body
+            data
         );
 
         return res.status(result.status).json({
@@ -130,30 +240,34 @@ const updateLove = async (req, res) => {
 
 // DELETE
 const deleteLove = async (req, res) => {
+
     try {
 
-        const { id } = req.params;
+        const result = await deleteLoveService(
 
-        const page = await deleteLoveService(id);
+            req.params.id,
 
-        if (!page) {
-            return res.status(404).json({
-                success: false,
-                message: "Không tìm thấy trang"
-            });
-        }
+            req.user.id
+        );
 
-        res.status(200).json({
-            success: true,
-            message: "Xóa thành công"
+        return res.status(result.status).json({
+
+            success: result.status === 200,
+
+            message: result.message
         });
 
     } catch (error) {
 
-        console.error("Delete Love Error:", error);
+        console.error(
+            "Delete Love Error:",
+            error
+        );
 
         res.status(500).json({
+
             success: false,
+
             message: error.message
         });
     }
@@ -161,7 +275,9 @@ const deleteLove = async (req, res) => {
 
 
 // VERIFY PIN
+
 const verifyPin = async (req, res) => {
+
     try {
 
         const { slug, pin } = req.body;
@@ -178,6 +294,7 @@ const verifyPin = async (req, res) => {
             pin
         );
 
+        // Không tìm thấy page
         if (isMatch === null) {
             return res.status(404).json({
                 success: false,
@@ -185,6 +302,7 @@ const verifyPin = async (req, res) => {
             });
         }
 
+        // Sai pin
         if (!isMatch) {
             return res.status(401).json({
                 success: false,
@@ -192,9 +310,27 @@ const verifyPin = async (req, res) => {
             });
         }
 
+        // Tạo access token cho page
+        const accessToken = jwt.sign(
+
+            {
+                slug,
+                access: true
+            },
+
+            process.env.JWT_SECRET,
+
+            {
+                expiresIn: "1h"
+            }
+        );
+
+        // Success
         res.status(200).json({
             success: true,
-            message: "Xác thực thành công"
+            message: "Xác thực thành công",
+
+            accessToken
         });
 
     } catch (error) {
@@ -207,6 +343,7 @@ const verifyPin = async (req, res) => {
         });
     }
 };
+
 
 
 // INCREASE VIEW
@@ -249,5 +386,5 @@ export {
     updateLove,
     deleteLove,
     verifyPin,
-    increaseViews
+    increaseViews,
 };

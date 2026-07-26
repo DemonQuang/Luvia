@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 
 import connectDB from "./config/db.js";
-
+import path from "path";
 import loveRoutes from "./routes/loveRoute.js";
 import authRoutes from "./routes/userRoutes.js";
 
@@ -14,7 +14,10 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
-
+app.use(
+    "/uploads",
+    express.static("uploads")
+);
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/loves", loveRoutes);

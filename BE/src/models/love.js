@@ -50,6 +50,16 @@ const loveSchema = new mongoose.Schema(
             music: {
                 type: String,
                 default: ""
+            },
+
+            recipient: {
+                type: String,
+                default: ""
+            },
+
+            occasion: {
+                type: String,
+                default: ""
             }
         },
 
