@@ -46,10 +46,12 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       audio.src = absoluteUrl;
       audio.load();
     }
+    setCurrentMusic(url);
     audio.play().then(() => {
       setIsPlaying(true);
-      setCurrentMusic(url);
-    }).catch(() => {});
+    }).catch(() => {
+      setIsPlaying(false);
+    });
   }, []);
 
   const pauseMusic = useCallback(() => {

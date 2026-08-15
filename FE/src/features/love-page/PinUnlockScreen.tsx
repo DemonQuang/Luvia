@@ -5,9 +5,10 @@ import { ShaderBackground } from '../../components/ui/ShaderBackground';
 interface PinUnlockScreenProps {
   slug: string;
   onUnlock: (pinToken: string) => void;
+  isStatic?: boolean;
 }
 
-export const PinUnlockScreen: React.FC<PinUnlockScreenProps> = ({ slug, onUnlock }) => {
+export const PinUnlockScreen: React.FC<PinUnlockScreenProps> = ({ slug, onUnlock, isStatic = false }) => {
   const [pin, setPin] = useState<string[]>(['', '', '', '']);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -19,8 +20,10 @@ export const PinUnlockScreen: React.FC<PinUnlockScreenProps> = ({ slug, onUnlock
   ];
 
   useEffect(() => {
-    inputRefs[0].current?.focus();
-  }, []);
+    if (!isStatic) {
+      inputRefs[0].current?.focus();
+    }
+  }, [isStatic]);
 
   const handleChange = (value: string, index: number) => {
     if (!/^\d*$/.test(value)) return;
@@ -105,7 +108,7 @@ export const PinUnlockScreen: React.FC<PinUnlockScreenProps> = ({ slug, onUnlock
 
           <h2 className="font-h2 text-h2 text-on-surface mb-3 font-semibold">Một món quà dành riêng cho bạn</h2>
           <p className="font-body-md text-on-surface-variant mb-8 leading-relaxed text-sm">
-            Vui lòng nhập mã PIN để mở khóa câu chuyện tình yêu.
+            Vui lòng nhập mã PIN để mở khóa trang kỷ niệm ngọt ngào.
           </p>
 
           <form className="w-full space-y-6" onSubmit={handleSubmit}>
@@ -123,6 +126,7 @@ export const PinUnlockScreen: React.FC<PinUnlockScreenProps> = ({ slug, onUnlock
                   onChange={(e) => handleChange(e.target.value, index)}
                   onKeyDown={(e) => handleKeyDown(e, index)}
                   onPaste={handlePaste}
+                  disabled={isStatic}
                   className="w-14 h-16 text-center text-h2 font-bold border-2 border-primary-fixed focus:border-primary bg-surface rounded-xl outline-none focus:ring-4 focus:ring-primary-container/20 transition-all font-body-md"
                 />
               ))}
@@ -138,7 +142,7 @@ export const PinUnlockScreen: React.FC<PinUnlockScreenProps> = ({ slug, onUnlock
             <button
               className="w-full py-4 bg-primary text-on-primary font-h3 rounded-full shadow-[0px_10px_30px_rgba(255,94,156,0.3)] active:scale-98 transition-all duration-300 flex items-center justify-center gap-2 primary-shine font-bold"
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isStatic}
             >
               {isSubmitting ? (
                 <>

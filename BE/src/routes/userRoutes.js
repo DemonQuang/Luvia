@@ -3,6 +3,7 @@ import express from "express";
 import {
     register,
     login,
+    forgotPassword,
     index,
     removeUser
 } from "../controllers/userController.js";
@@ -12,11 +13,14 @@ import {
     isAdmin
 } from "../middleware/auth.js";
 
+import { authLimiter } from "../middleware/rateLimiter.js";
+
 const router = express.Router();
 
 // AUTH
-router.post("/register", register);
-router.post("/login", login);
+router.post("/register", authLimiter, register);
+router.post("/login", authLimiter, login);
+router.post("/forgot-password", authLimiter, forgotPassword);
 
 // ADMIN
 router.get("/admin/users", verifyToken, isAdmin, index);

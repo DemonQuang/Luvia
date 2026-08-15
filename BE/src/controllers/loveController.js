@@ -35,8 +35,28 @@ const createLove = async (req, res) => {
                 message: "Content JSON không hợp lệ"
             });
         }
-        content.images = imageUrls;
-        content.music = musicUrl;
+        let finalImages = imageUrls;
+        if (content.mainImage) {
+            if (content.mainImage === 'new_first' && imageUrls.length > 0) {
+                const mainUrl = imageUrls[0];
+                const idx = finalImages.indexOf(mainUrl);
+                if (idx > -1) {
+                    const [mainImg] = finalImages.splice(idx, 1);
+                    finalImages.unshift(mainImg);
+                }
+                content.mainImage = finalImages[0];
+            } else {
+                const idx = finalImages.indexOf(content.mainImage);
+                if (idx > -1) {
+                    const [mainImg] = finalImages.splice(idx, 1);
+                    finalImages.unshift(mainImg);
+                }
+            }
+        } else {
+            content.mainImage = "";
+        }
+        content.images = finalImages;
+        content.music = musicUrl || content.music || "";
         const data = {
             ...req.body,
             content
@@ -209,13 +229,34 @@ const updateLove = async (req, res) => {
 
         // Combine existing images (that were kept) and new images (that were uploaded)
         const existingImages = content.existingImages || [];
-        content.images = [...existingImages, ...imageUrls];
+        let finalImages = [...existingImages, ...imageUrls];
+
+        if (content.mainImage) {
+            if (content.mainImage === 'new_first' && imageUrls.length > 0) {
+                const mainUrl = imageUrls[0];
+                const idx = finalImages.indexOf(mainUrl);
+                if (idx > -1) {
+                    const [mainImg] = finalImages.splice(idx, 1);
+                    finalImages.unshift(mainImg);
+                }
+                content.mainImage = finalImages[0];
+            } else {
+                const idx = finalImages.indexOf(content.mainImage);
+                if (idx > -1) {
+                    const [mainImg] = finalImages.splice(idx, 1);
+                    finalImages.unshift(mainImg);
+                }
+            }
+        } else {
+            content.mainImage = "";
+        }
+        content.images = finalImages;
 
         // Combine music: use newly uploaded music if available, otherwise fallback to existing music
         const existingMusic = content.existingMusic || "";
-        content.music = musicUrl || existingMusic;
+        content.music = musicUrl || content.music || existingMusic;
 
-        const data = { ...req.body, content };
+        const data = { ...req.body, content, imageUrls, musicUrl };
 
         const result = await updateLoveService(
             req.params.id,

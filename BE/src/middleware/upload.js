@@ -22,7 +22,7 @@ const storage = multer.diskStorage({
 
 // File filter
 const fileFilter = (req, file, cb) => {
-    const allowedTypes = [
+    const allowedMimeTypes = [
         // IMAGE
         "image/png",
         "image/jpeg",
@@ -35,15 +35,27 @@ const fileFilter = (req, file, cb) => {
         "audio/wav"
     ];
 
-    // Check type
+    const allowedExtensions = [
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".webp",
+        ".mp3",
+        ".wav"
+    ];
+
+    const ext = path.extname(file.originalname).toLowerCase();
+
+    // Check type and extension
     if (
-        allowedTypes.includes(file.mimetype)
+        allowedMimeTypes.includes(file.mimetype) &&
+        allowedExtensions.includes(ext)
     ) {
         cb(null, true);
     } else {
         cb(
             new Error(
-                "Chỉ cho phép upload ảnh hoặc nhạc"
+                "Chỉ cho phép upload ảnh hoặc nhạc với định dạng hợp lệ (.png, .jpg, .jpeg, .webp, .mp3, .wav)"
             ),
             false
         );

@@ -220,3 +220,25 @@ export const removeUser = async (req, res) => {
         });
     }
 };
+
+// FORGOT PASSWORD (MOCK)
+export const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: "Email is required"
+            });
+        }
+        res.status(200).json({
+            success: true,
+            message: "Liên kết khôi phục mật khẩu đã được gửi đến email của bạn."
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};

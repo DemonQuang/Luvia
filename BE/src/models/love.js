@@ -31,8 +31,24 @@ const loveSchema = new mongoose.Schema(
 
         theme: {
             type: String,
-            enum: ["cute", "romantic", "dark"],
             default: "cute"
+        },
+
+        recipientType: {
+            type: String,
+            enum: ["LOVER", "MOTHER", "FATHER", "SPOUSE", "FAMILY", "GRANDPARENT", "FRIEND", "CHILD", "TEACHER", "OTHER"],
+            default: "OTHER"
+        },
+
+        occasion: {
+            type: String,
+            default: "OTHER"
+        },
+
+        status: {
+            type: String,
+            enum: ["DRAFT", "PUBLISHED", "HIDDEN", "ARCHIVED"],
+            default: "PUBLISHED"
         },
 
         content: {
@@ -45,6 +61,31 @@ const loveSchema = new mongoose.Schema(
             images: {
                 type: [String],
                 default: []
+            },
+
+            mainImage: {
+                type: String,
+                default: ""
+            },
+
+            layout: {
+                type: String,
+                default: ""
+            },
+
+            background: {
+                type: String,
+                default: ""
+            },
+
+            primaryColor: {
+                type: String,
+                default: ""
+            },
+
+            secondaryColor: {
+                type: String,
+                default: ""
             },
 
             music: {

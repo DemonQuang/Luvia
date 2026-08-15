@@ -14,8 +14,8 @@ import ProfilePage from '../pages/ProfilePage';
 import AdminPage from '../pages/AdminPage';
 import LovePageDetailPage from '../pages/LovePageDetailPage';
 import LovePageBuilder from '../features/love-page/LovePageBuilder';
-import GalleryPage from '../pages/GalleryPage';
-import LetterPage from '../pages/LetterPage';
+import GalleryPage from '../pages/khoanh-khac/GalleryPage';
+import LetterPage from '../pages/doc-thu/LetterPage';
 
 export const AppRouter: React.FC = () => {
   return (

@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import mongoose from "mongoose";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 
 
 const deleteFileByUrl = (url) => {
@@ -30,6 +31,9 @@ const createLoveService = async (
         title,
         pin,
         theme = "cute",
+        recipientType = "OTHER",
+        occasion = "OTHER",
+        status = "PUBLISHED",
         content = {}
     } = data;
 
@@ -47,13 +51,11 @@ const createLoveService = async (
         );
     }
 
-    // Random slug
+    // Random slug using UUID segment (8 characters)
     let slug;
     let existingSlug;
     do {
-        slug = Math.random()
-            .toString(36)
-            .substring(2, 8);
+        slug = crypto.randomUUID().split('-')[0];
         existingSlug =
             await Love.findOne({ slug });
     } while (existingSlug);
@@ -68,11 +70,24 @@ const createLoveService = async (
         slug,
         pinHash,
         theme,
+        recipientType,
+        occasion,
+        status,
         content: {
             messages:
                 content.messages ?? [],
             images:
                 content.images ?? [],
+            mainImage:
+                content.mainImage ?? "",
+            layout:
+                content.layout ?? "",
+            background:
+                content.background ?? "",
+            primaryColor:
+                content.primaryColor ?? "",
+            secondaryColor:
+                content.secondaryColor ?? "",
             music:
                 content.music ?? "",
             recipient:
@@ -116,8 +131,13 @@ const updateLoveService = async (
     const {
         title,
         theme,
+        recipientType,
+        occasion,
+        status,
         content,
-        pin
+        pin,
+        imageUrls = [],
+        musicUrl = ""
     } = data;
 
     // Validate ObjectId
@@ -149,8 +169,10 @@ const updateLoveService = async (
 
     // Update
     page.title = title || page.title;
-
     page.theme = theme || page.theme;
+    if (recipientType) page.recipientType = recipientType;
+    if (occasion) page.occasion = occasion;
+    if (status) page.status = status;
 
     if (pin) {
         if (String(pin).length < 4) {
@@ -160,27 +182,59 @@ const updateLoveService = async (
     }
 
     if (content) {
-        // Compare and delete removed images from disk
+        // Compare and delete removed images from disk safely
         if (content.images !== undefined) {
             const oldImages = page.content.images || [];
-            const newImages = content.images || [];
-            const deletedImages = oldImages.filter(img => !newImages.includes(img));
+            // Chỉ giữ lại ảnh cũ thuộc về page HOẶC ảnh mới vừa upload trong request này
+            const safeExistingImages = content.images.filter(img => oldImages.includes(img));
+            const finalImages = [...safeExistingImages, ...imageUrls];
+
+            const deletedImages = oldImages.filter(img => !finalImages.includes(img));
             deletedImages.forEach(img => deleteFileByUrl(img));
-            page.content.images = newImages;
+            page.content.images = finalImages;
         }
 
-        // Compare and delete removed music from disk
+        // Compare and delete removed music from disk safely
         if (content.music !== undefined) {
             const oldMusic = page.content.music;
-            const newMusic = content.music;
-            if (oldMusic && oldMusic !== newMusic) {
+            let finalMusic = "";
+            if (musicUrl) {
+                finalMusic = musicUrl; // dùng nhạc mới upload
+            } else if (content.music === oldMusic) {
+                finalMusic = oldMusic; // giữ nhạc cũ
+            } else {
+                finalMusic = ""; // xóa nhạc
+            }
+
+            if (oldMusic && oldMusic !== finalMusic) {
                 deleteFileByUrl(oldMusic);
             }
-            page.content.music = newMusic;
+            page.content.music = finalMusic;
         }
 
         if (content.messages !== undefined) {
             page.content.messages = content.messages;
+        }
+
+        if (content.mainImage !== undefined) {
+            // Đảm bảo mainImage phải nằm trong danh sách ảnh hợp lệ của trang
+            if (page.content.images.includes(content.mainImage)) {
+                page.content.mainImage = content.mainImage;
+            } else {
+                page.content.mainImage = page.content.images[0] || "";
+            }
+        }
+        if (content.layout !== undefined) {
+            page.content.layout = content.layout;
+        }
+        if (content.background !== undefined) {
+            page.content.background = content.background;
+        }
+        if (content.primaryColor !== undefined) {
+            page.content.primaryColor = content.primaryColor;
+        }
+        if (content.secondaryColor !== undefined) {
+            page.content.secondaryColor = content.secondaryColor;
         }
 
         page.content.recipient =

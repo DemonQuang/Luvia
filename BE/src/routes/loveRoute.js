@@ -14,6 +14,8 @@ import {
     verifyToken
 } from "../middleware/auth.js";
 
+import { pinLimiter } from "../middleware/rateLimiter.js";
+
 const router = express.Router();
 
 
@@ -21,7 +23,7 @@ const router = express.Router();
 
 router.get("/page/:slug", getLoveBySlug);
 
-router.post("/verify-pin", verifyPin);
+router.post("/verify-pin", pinLimiter, verifyPin);
 
 router.patch("/:slug/view", increaseViews);
 
@@ -37,7 +39,7 @@ router.post(
     "/",
     verifyToken,
     upload.fields([
-        { name: "images", maxCount: 10 },
+        { name: "images", maxCount: 13 },
         { name: "music", maxCount: 1 }
     ]),
     createLove
@@ -47,7 +49,7 @@ router.put(
     "/:id",
     verifyToken,
     upload.fields([
-        { name: "images", maxCount: 10 },
+        { name: "images", maxCount: 13 },
         { name: "music", maxCount: 1 }
     ]),
     updateLove

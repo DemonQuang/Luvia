@@ -1,7 +1,7 @@
 import React from 'react';
-import UserManagement from '../features/admin/UserManagement';
+import AdminDashboard from '../features/admin/AdminDashboard';
 
 export const AdminPage: React.FC = () => {
-  return <UserManagement />;
+  return <AdminDashboard />;
 };
 export default AdminPage;

@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import api from '../services/api';
-import { LovePage } from '../types';
-import { useMusic } from '../store/music.store';
+import api from '../../services/api';
+import { LovePage, Theme } from '../../types';
+import { useMusic } from '../../store/music.store';
+import { ParticleBackground } from '../../components/ui/ParticleBackground';
 import './LetterPage.scss';
 
 export const LetterPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const [lovePage, setLovePage] = useState<LovePage | null>(null);
+  const [themeConfig, setThemeConfig] = useState<Theme | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -21,6 +23,64 @@ export const LetterPage: React.FC = () => {
 
   // Floating Music Player state
   const { isPlaying, progress: audioProgress, togglePlay, playMusic, pauseMusic, currentMusic } = useMusic();
+
+  // Music Floater States & Handlers (same as CosmicGallery)
+  const [musicExpanded, setMusicExpanded] = useState(false);
+  const [musicPos, setMusicPos] = useState({ x: 24, y: 24 });
+  const musicDragRef = useRef({ dragging: false, moved: false, startX: 0, startY: 0, startPosX: 0, startPosY: 0 });
+
+  const handleMusicMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const d = musicDragRef.current;
+    d.dragging = true;
+    d.moved = false;
+    d.startX = e.clientX;
+    d.startY = e.clientY;
+    d.startPosX = musicPos.x;
+    d.startPosY = musicPos.y;
+
+    const handleMove = (ev: MouseEvent) => {
+      if (!d.dragging) return;
+      const dx = ev.clientX - d.startX;
+      const dy = ev.clientY - d.startY;
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) d.moved = true;
+      setMusicPos({ x: d.startPosX + dx, y: d.startPosY + dy });
+    };
+    const handleUp = () => { d.dragging = false; window.removeEventListener('mousemove', handleMove); window.removeEventListener('mouseup', handleUp); };
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+  }, [musicPos.x, musicPos.y]);
+
+  const handleMusicTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    const d = musicDragRef.current;
+    d.dragging = true;
+    d.moved = false;
+    d.startX = touch.clientX;
+    d.startY = touch.clientY;
+    d.startPosX = musicPos.x;
+    d.startPosY = musicPos.y;
+
+    const handleMove = (ev: TouchEvent) => {
+      const t = ev.touches[0];
+      const dx = t.clientX - d.startX;
+      const dy = t.clientY - d.startY;
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) d.moved = true;
+      setMusicPos({ x: d.startPosX + dx, y: d.startPosY + dy });
+    };
+    const handleEnd = () => { d.dragging = false; window.removeEventListener('touchmove', handleMove); window.removeEventListener('touchend', handleEnd); };
+    window.addEventListener('touchmove', handleMove);
+    window.addEventListener('touchend', handleEnd);
+  }, [musicPos.x, musicPos.y]);
+
+  const handleNoteClick = useCallback(() => {
+    if (!musicDragRef.current.moved) setMusicExpanded(p => !p);
+  }, []);
+
+  const handlePlayClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    togglePlay();
+  }, [togglePlay]);
 
   // Load love page data
   useEffect(() => {
@@ -63,13 +123,92 @@ export const LetterPage: React.FC = () => {
     }
   }, [loading, lovePage]);
 
-
-
   const lovePageData = lovePage;
   const content = lovePageData?.content;
   const messages = content?.messages || [];
   const music = content?.music || '';
   const lastMessage = messages[messages.length - 1] || "Mãi yêu em!";
+
+  // Fetch theme configuration when lovePage changes
+  useEffect(() => {
+    if (!lovePage) return;
+    const fetchTheme = async () => {
+      try {
+        const res = await api.themes.getThemeByKey(lovePage.theme);
+        if (res.success && res.data) {
+          setThemeConfig(res.data);
+        }
+      } catch (e) {
+        console.error("Error loading theme config in Letter Page:", e);
+      }
+    };
+    fetchTheme();
+  }, [lovePage]);
+
+  const isLoverStyle = useMemo(() => {
+    if (themeConfig && themeConfig.letterLayout) {
+      return themeConfig.letterLayout === 'flowers';
+    }
+    // Fallback logic
+    if (!lovePage) return true;
+    if (lovePage.theme === 'romantic') return true;
+    if (lovePage.theme === 'cute' || lovePage.theme === 'dark') return false;
+    return lovePage.recipientType === 'LOVER' || lovePage.recipientType === 'SPOUSE' || !lovePage.recipientType;
+  }, [themeConfig, lovePage]);
+
+  const getEnvelopeLabel = (type?: string) => {
+    switch (type) {
+      case 'MOTHER': return 'Gửi Mẹ kính yêu 👩';
+      case 'FATHER': return 'Gửi Cha kính yêu 👨';
+      case 'GRANDPARENT': return 'Kính gửi Ông Bà 👵';
+      case 'TEACHER': return 'Tri ân Thầy Cô 🎓';
+      case 'FAMILY': return 'Gửi cả gia đình ❤️';
+      case 'FRIEND': return 'Gửi bạn thân thiết 👭';
+      case 'CHILD': return 'Gửi con yêu thương 👶';
+      case 'OTHER': return 'Gửi lời thương mến ✨';
+      default: return 'Gửi người thương ❤️';
+    }
+  };
+
+  const getSignOffText = (type?: string) => {
+    switch (type) {
+      case 'MOTHER':
+      case 'FATHER':
+      case 'GRANDPARENT':
+      case 'FAMILY':
+        return 'Con của bố mẹ ❤️';
+      case 'TEACHER':
+        return 'Học trò kính chúc 💐';
+      case 'FRIEND':
+        return 'Mãi là bạn tốt 👭';
+      case 'CHILD':
+        return 'Bố mẹ yêu con ❤️';
+      default:
+        return 'Thương mến ❤️';
+    }
+  };
+
+
+
+  const handleExit = () => {
+    window.close();
+    setTimeout(() => {
+      window.location.href = 'about:blank';
+    }, 100);
+  };
+
+  const heartsArray = useMemo(() => {
+    if (!endingActive) return [];
+    return Array.from({ length: 60 }).map((_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      delay: Math.random() * 6,
+      duration: Math.random() * 4 + 3,
+      size: Math.random() * 20 + 10,
+      opacity: Math.random() * 0.6 + 0.4,
+      rotation: Math.random() * 60 - 30,
+    }));
+  }, [endingActive]);
 
   const galleryImages = useMemo(() => {
     if (!lovePageData) return [];
@@ -149,7 +288,43 @@ export const LetterPage: React.FC = () => {
   }
 
   return (
-    <div className={`letter-page-container ${loaded ? '' : 'not-loaded'}`}>
+    <div className={`letter-page-container ${loaded ? '' : 'not-loaded'} ${isLoverStyle ? '' : 'non-lover'}`}>
+      <style>
+        {`
+          .letter-page-container.non-lover {
+            background: linear-gradient(to bottom, #fff5f7, #ffe3e9) !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+          }
+          .letter-page-container.non-lover .flowers,
+          .letter-page-container.non-lover .night {
+            display: none !important;
+          }
+          .letter-page-container.non-lover .envelope-backdrop {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent !important;
+            position: absolute;
+            inset: 0;
+          }
+          .letter-page-container.non-lover .envelope-wrapper {
+            margin-top: 0 !important;
+          }
+          .letter-page-container.non-lover .floating-envelope-btn {
+            background-color: var(--theme-primary, #ff5e9c) !important;
+          }
+          .letter-page-container.non-lover .ending-title {
+            color: var(--theme-primary, #ff5e9c) !important;
+          }
+        `}
+      </style>
+
+      {/* Warm light particles bokeh for families */}
+      {!isLoverStyle && <ParticleBackground type="light" primaryColor="#ff8fab" />}
+
       {/* Night Sky Background */}
       <div className="night"></div>
 
@@ -482,7 +657,7 @@ export const LetterPage: React.FC = () => {
           <div className="envelope-flap"></div>
           <div className="envelope-letter">
             <span className="material-symbols-outlined letter-heart">favorite</span>
-            <span className="letter-label">Gửi em ❤️</span>
+            <span className="letter-label">{getEnvelopeLabel(lovePage?.recipientType)}</span>
           </div>
         </div>
       </div>
@@ -490,26 +665,31 @@ export const LetterPage: React.FC = () => {
       {/* Fullscreen Expanded Letter Overlay */}
       <div className={`letter-expanded-overlay ${letterExpanded ? 'active' : ''}`}>
         <div className="letter-expanded-card relative z-10 text-white">
-          <span className="material-symbols-outlined text-primary text-4xl mb-4 block" style={{ fontVariationSettings: "'FILL' 1" }}>format_quote</span>
-          <div className="font-handwriting text-2xl md:text-3xl leading-relaxed mb-6">
-            {lastMessage}
-          </div>
+          {/* Scrollable Letter Content */}
+          <div className="letter-scroll-content flex-1 overflow-y-auto pr-2 mb-6">
+            <span className="material-symbols-outlined text-primary text-4xl mb-4 block" style={{ fontVariationSettings: "'FILL' 1" }}>format_quote</span>
+            <div className="font-handwriting text-2xl md:text-3xl leading-relaxed mb-6">
+              {lastMessage}
+            </div>
 
-          <div className="text-right mb-6">
-            <p className="font-label-caps text-label-caps text-primary tracking-widest uppercase font-semibold">Mãi yêu ❤️</p>
+            <div className="text-right mb-2">
+              <p className="font-label-caps text-label-caps text-primary tracking-widest uppercase font-semibold">
+                {getSignOffText(lovePage?.recipientType)}
+              </p>
+            </div>
           </div>
 
           {/* Letter Buttons: Kết thúc & Ngắm vườn hoa */}
-          <div className="flex gap-4 border-t border-white/10 pt-6 mt-6">
+          <div className="flex gap-3 md:gap-4 border-t border-white/10 pt-6">
             <button
               onClick={handleAdmireGarden}
-              className="flex-1 py-3 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold transition-all"
+              className="flex-1 py-2.5 md:py-3 px-3 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm md:text-base font-semibold transition-all text-center whitespace-nowrap flex items-center justify-center"
             >
-              Ngắm vườn hoa ✨
+              Ngắm cảnh ✨
             </button>
             <button
               onClick={handleFinish}
-              className="flex-1 py-3 rounded-full bg-primary hover:bg-primary/95 text-white font-semibold transition-all shadow-[0_0_15px_rgba(178,30,97,0.4)]"
+              className="flex-1 py-2.5 md:py-3 px-3 rounded-full bg-primary hover:bg-primary/95 text-white text-sm md:text-base font-semibold transition-all shadow-[0_0_15px_rgba(178,30,97,0.4)] text-center whitespace-nowrap flex items-center justify-center"
             >
               Kết thúc ❤️
             </button>
@@ -538,129 +718,111 @@ export const LetterPage: React.FC = () => {
 
       {/* Final Ending Screen Backdrop Overlay */}
       <div className={`ending-backdrop-overlay ${endingActive ? 'active' : ''}`}>
-        <h1 className="ending-title font-handwriting">Mãi yêu ❤️</h1>
-        <div className="flex justify-center gap-4 mb-8">
-          <span className="material-symbols-outlined text-primary text-6xl animate-pulse" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
-          <span className="material-symbols-outlined text-primary text-6xl animate-pulse [animation-delay:200ms]" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
-          <span className="material-symbols-outlined text-primary text-6xl animate-pulse [animation-delay:400ms]" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
+        {/* Falling Heart Rain (Storm) Effect */}
+        {endingActive && (
+          <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+            <style>{`
+              @keyframes heart-fall {
+                0% {
+                  transform: translateY(0) rotate(0deg) scale(0.7);
+                  opacity: 0;
+                }
+                10% {
+                  opacity: var(--op);
+                }
+                90% {
+                  opacity: var(--op);
+                }
+                100% {
+                  transform: translateY(105vh) rotate(var(--rot)) scale(1.2);
+                  opacity: 0;
+                }
+              }
+            `}</style>
+            {heartsArray.map((heart) => (
+              <span
+                key={heart.id}
+                className="material-symbols-outlined absolute text-primary"
+                style={{
+                  left: `${heart.left}%`,
+                  animation: `heart-fall ${heart.duration}s linear ${heart.delay}s infinite`,
+                  fontSize: `${heart.size}px`,
+                  top: '-50px',
+                  fontVariationSettings: "'FILL' 1",
+                  ['--op' as any]: heart.opacity,
+                  ['--rot' as any]: `${heart.rotation}deg`,
+                }}
+              >
+                favorite
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Content Wrapper */}
+        <div className="relative z-10 flex flex-col items-center justify-center text-center pointer-events-auto">
+          <h1 className="ending-title font-handwriting">Mãi Yêu Thương ❤️</h1>
+          <div className="flex justify-center gap-4 mb-8">
+            <span className="material-symbols-outlined text-primary text-6xl animate-pulse" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
+            <span className="material-symbols-outlined text-primary text-6xl animate-pulse [animation-delay:200ms]" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
+            <span className="material-symbols-outlined text-primary text-6xl animate-pulse [animation-delay:400ms]" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
+          </div>
+          <p className="text-white/80 font-body-lg text-center max-w-md leading-relaxed mb-8">
+            Kỷ niệm đẹp đẽ này sẽ luôn được nâng niu và lưu giữ trọn vẹn trong góc yêu thương của chúng ta. ✨
+          </p>
+          <button
+            onClick={handleExit}
+            className="px-8 py-3 rounded-full bg-primary hover:bg-primary/95 text-white font-semibold transition-all shadow-[0_0_20px_rgba(178,30,97,0.5)] active:scale-95"
+          >
+            Kết thúc
+          </button>
         </div>
-        <p className="text-white/80 font-body-lg text-center max-w-md leading-relaxed mb-8">
-          Cảm ơn em đã đồng hành cùng Luvia. Kỷ niệm ngọt ngào này sẽ luôn được lưu giữ trọn vẹn trong vũ trụ tình yêu của chúng ta. ✨
-        </p>
-        <button
-          onClick={() => navigate(`/page/${slug}`)}
-          className="px-8 py-3 rounded-full bg-primary hover:bg-primary/95 text-white font-semibold transition-all shadow-[0_0_20px_rgba(178,30,97,0.5)] active:scale-95"
-        >
-          Quay về trang chính
-        </button>
       </div>
 
       {/* Floating Music Player */}
-      {music && (() => {
-        const MusicFloater: React.FC = () => {
-          const [expanded, setExpanded] = useState(false);
-          const [pos, setPos] = useState({ x: 24, y: 24 });
-          const dragRef = useRef({ dragging: false, moved: false, startX: 0, startY: 0, startPosX: 0, startPosY: 0 });
-
-          const handleMouseDown = useCallback((e: React.MouseEvent) => {
-            e.preventDefault();
-            const d = dragRef.current;
-            d.dragging = true;
-            d.moved = false;
-            d.startX = e.clientX;
-            d.startY = e.clientY;
-            d.startPosX = pos.x;
-            d.startPosY = pos.y;
-
-            const handleMove = (ev: MouseEvent) => {
-              if (!d.dragging) return;
-              const dx = ev.clientX - d.startX;
-              const dy = ev.clientY - d.startY;
-              if (Math.abs(dx) > 5 || Math.abs(dy) > 5) d.moved = true;
-              setPos({ x: d.startPosX + dx, y: d.startPosY + dy });
-            };
-            const handleUp = () => { d.dragging = false; window.removeEventListener('mousemove', handleMove); window.removeEventListener('mouseup', handleUp); };
-            window.addEventListener('mousemove', handleMove);
-            window.addEventListener('mouseup', handleUp);
-          }, [pos.x, pos.y]);
-
-          const handleTouchStart = useCallback((e: React.TouchEvent) => {
-            const touch = e.touches[0];
-            const d = dragRef.current;
-            d.dragging = true;
-            d.moved = false;
-            d.startX = touch.clientX;
-            d.startY = touch.clientY;
-            d.startPosX = pos.x;
-            d.startPosY = pos.y;
-
-            const handleMove = (ev: TouchEvent) => {
-              const t = ev.touches[0];
-              const dx = t.clientX - d.startX;
-              const dy = t.clientY - d.startY;
-              if (Math.abs(dx) > 5 || Math.abs(dy) > 5) d.moved = true;
-              setPos({ x: d.startPosX + dx, y: d.startPosY + dy });
-            };
-            const handleEnd = () => { d.dragging = false; window.removeEventListener('touchmove', handleMove); window.removeEventListener('touchend', handleEnd); };
-            window.addEventListener('touchmove', handleMove);
-            window.addEventListener('touchend', handleEnd);
-          }, [pos.x, pos.y]);
-
-          const handleNoteClick = useCallback(() => {
-            if (!dragRef.current.moved) setExpanded(p => !p);
-          }, []);
-
-          const handlePlayClick = useCallback((e: React.MouseEvent) => {
-            e.stopPropagation();
-            togglePlay();
-          }, [togglePlay]);
-
-          return (
-            <div className="fixed z-50" style={{ left: pos.x, bottom: pos.y }}>
-              {/* Collapsed: note icon only */}
-              {!expanded && (
-                <div
-                  onClick={handleNoteClick}
-                  onMouseDown={handleMouseDown}
-                  onTouchStart={handleTouchStart}
-                  className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center hover:bg-white/20 transition-all cursor-grab active:cursor-grabbing relative overflow-hidden shadow-lg animate-bounce"
-                >
-                  <div className={`absolute inset-0 bg-primary/20 rounded-full ${isPlaying ? 'animate-spin' : ''}`} style={{ animationDuration: '3s' }} />
-                  <span className="material-symbols-outlined text-white text-xl relative z-10 pointer-events-none">music_note</span>
-                </div>
-              )}
-
-              {/* Expanded: full player */}
-              {expanded && (
-                <div className="bg-[#16213e]/90 backdrop-blur-md dreamy-shadow rounded-full px-6 py-3 flex items-center justify-between gap-4 border border-white/10 relative overflow-hidden shadow-lg max-w-xs text-white">
-                  <div
-                    onClick={handleNoteClick}
-                    onMouseDown={handleMouseDown}
-                    onTouchStart={handleTouchStart}
-                    className="flex items-center gap-4 flex-1 min-w-0 cursor-grab active:cursor-grabbing"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-primary-container/20 flex items-center justify-center relative overflow-hidden">
-                      <div className={`absolute inset-0 bg-primary/20 rounded-full ${isPlaying ? 'animate-spin' : ''}`} style={{ animationDuration: '3s' }} />
-                      <span className="material-symbols-outlined text-primary text-xl relative z-10 pointer-events-none">music_note</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-label-caps text-label-caps text-primary truncate font-semibold pointer-events-none">Nhạc nền</p>
-                      <p className="font-caption text-[10px] text-white/60 truncate uppercase tracking-tighter pointer-events-none">Kỷ niệm của chúng ta</p>
-                    </div>
-                  </div>
-                  <button onClick={handlePlayClick} className="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center hover:scale-105 transition-transform active:scale-95 flex-shrink-0">
-                    <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>{isPlaying ? 'pause' : 'play_arrow'}</span>
-                  </button>
-                  <div className="h-1 absolute bottom-0 left-0 right-0 bg-primary/10 rounded-full overflow-hidden">
-                    <div className="h-full bg-primary transition-all duration-200" style={{ width: `${audioProgress}%` }} />
-                  </div>
-                </div>
-              )}
+      {music && (
+        <div className="fixed z-50 animate-fade-in" style={{ left: musicPos.x, bottom: musicPos.y }}>
+          {/* Collapsed: note icon only */}
+          {!musicExpanded && (
+            <div
+              onClick={handleNoteClick}
+              onMouseDown={handleMusicMouseDown}
+              onTouchStart={handleMusicTouchStart}
+              className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center hover:bg-white/20 transition-all cursor-grab active:cursor-grabbing relative overflow-hidden shadow-lg"
+            >
+              <div className={`absolute inset-0 bg-primary/20 rounded-full ${isPlaying ? 'animate-spin' : ''}`} style={{ animationDuration: '3s' }} />
+              <span className="material-symbols-outlined text-white text-xl relative z-10 pointer-events-none">music_note</span>
             </div>
-          );
-        };
-        return <MusicFloater />;
-      })()}
+          )}
+
+          {/* Expanded: full player */}
+          {musicExpanded && (
+            <div className="bg-[#16213e]/90 backdrop-blur-md dreamy-shadow rounded-full px-6 py-3 flex items-center justify-between gap-4 border border-white/10 relative overflow-hidden shadow-lg max-w-xs text-white">
+              <div
+                onClick={handleNoteClick}
+                onMouseDown={handleMusicMouseDown}
+                onTouchStart={handleMusicTouchStart}
+                className="flex items-center gap-4 flex-1 min-w-0 cursor-grab active:cursor-grabbing"
+              >
+                <div className="w-10 h-10 rounded-full bg-primary-container/20 flex items-center justify-center relative overflow-hidden">
+                  <div className={`absolute inset-0 bg-primary/20 rounded-full ${isPlaying ? 'animate-spin' : ''}`} style={{ animationDuration: '3s' }} />
+                  <span className="material-symbols-outlined text-primary text-xl relative z-10 pointer-events-none">music_note</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-label-caps text-label-caps text-primary truncate font-semibold pointer-events-none">Nhạc nền</p>
+                  <p className="font-caption text-[10px] text-white/60 truncate uppercase tracking-tighter pointer-events-none">Kỷ niệm của chúng ta</p>
+                </div>
+              </div>
+              <button onClick={handlePlayClick} className="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center hover:scale-105 transition-transform active:scale-95 flex-shrink-0">
+                <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>{isPlaying ? 'pause' : 'play_arrow'}</span>
+              </button>
+              <div className="h-1 absolute bottom-0 left-0 right-0 bg-primary/10 rounded-full overflow-hidden">
+                <div className="h-full bg-primary transition-all duration-200" style={{ width: `${audioProgress}%` }} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
