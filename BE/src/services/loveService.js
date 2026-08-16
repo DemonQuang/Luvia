@@ -218,7 +218,9 @@ const updateLoveService = async (
 
         if (content.mainImage !== undefined) {
             // Đảm bảo mainImage phải nằm trong danh sách ảnh hợp lệ của trang
-            if (page.content.images.includes(content.mainImage)) {
+            if (content.mainImage === "") {
+                page.content.mainImage = "";
+            } else if (page.content.images.includes(content.mainImage)) {
                 page.content.mainImage = content.mainImage;
             } else {
                 page.content.mainImage = page.content.images[0] || "";
