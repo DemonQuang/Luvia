@@ -39,7 +39,7 @@ router.post(
     "/",
     verifyToken,
     upload.fields([
-        { name: "images", maxCount: 13 },
+        { name: "images", maxCount: 50 },
         { name: "music", maxCount: 1 }
     ]),
     createLove
@@ -49,7 +49,7 @@ router.put(
     "/:id",
     verifyToken,
     upload.fields([
-        { name: "images", maxCount: 13 },
+        { name: "images", maxCount: 50 },
         { name: "music", maxCount: 1 }
     ]),
     updateLove

@@ -168,7 +168,10 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
   const messages = content.messages || [];
   const images = content.images || [];
   const music = content.music || '';
-  const mainCoverImage = content.mainImage !== undefined ? content.mainImage : (images.length > 0 ? images[0] : '');
+  
+  // check if mainImage is present (Hero Image option)
+  const mainCoverImage = content.mainImage || '';
+  const hasCover = !!mainCoverImage;
 
   const galleryLayout = useMemo(() => {
     if (themeConfig && themeConfig.galleryLayout) {
@@ -201,7 +204,17 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
       ? { title: m.slice(0, sep), content: m.slice(sep + 2) }
       : { title: '', content: m };
   }), [messages]);
-  const galleryImages = useMemo(() => images.slice(storyChapters.length), [images, storyChapters.length]);
+
+  // If we have a cover, the first image is used as the cover, so chapters use images starting from index 1.
+  // If we don't have a cover, chapters use images starting from index 0.
+  const chapterImages = useMemo(() => {
+    return hasCover ? images.slice(1) : images;
+  }, [images, hasCover]);
+
+  // Gallery images are the remaining images
+  const galleryImages = useMemo(() => {
+    return chapterImages.slice(storyChapters.length);
+  }, [chapterImages, storyChapters.length]);
 
   // Audio setup
   useEffect(() => {
@@ -349,6 +362,16 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
             <div className={`absolute inset-0 bg-gradient-to-b from-transparent ${isDark ? 'via-[#1a1a2e]/20 to-[#1a1a2e]' : 'via-background/20 to-background'}`} />
           </div>
           <RevealSection className="relative z-10 text-center max-w-4xl">
+            {!mainCoverImage && (
+              <div className="flex justify-center mb-8 relative select-none">
+                {/* Glowing background halo */}
+                <div className="absolute inset-0 w-36 h-36 bg-primary/25 rounded-full filter blur-xl animate-pulse mx-auto" />
+                {/* Floating duck component */}
+                <div className="relative animate-float shadow-[0_0_35px_rgba(255,94,156,0.3)] rounded-full p-2.5 bg-white/40 backdrop-blur-sm border border-white/20">
+                  <SunflowerDuck size={110} />
+                </div>
+              </div>
+            )}
             <p className="font-label-caps text-label-caps text-primary mb-4 tracking-[0.2em] uppercase font-semibold">{title}</p>
             <h1 className="font-display text-h1-mobile md:text-h1 leading-tight mb-8 px-4 italic font-bold" style={{ color: isDark ? '#f8f9ff' : undefined }}>
               "{heroMessage}"
@@ -368,7 +391,7 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
           <section className="max-w-5xl mx-auto py-12 px-6 space-y-16 md:space-y-24">
             {storyChapters.map((ch, idx) => {
               const isEven = idx % 2 === 0;
-              const imgUrl = images[idx] || (images.length > 0 ? images[idx % images.length] : '');
+              const imgUrl = chapterImages[idx] || (chapterImages.length > 0 ? chapterImages[idx % chapterImages.length] : '');
               return (
                 <RevealSection key={idx}>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 items-center">
@@ -404,7 +427,7 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
             <div className="space-y-16">
               {storyChapters.map((ch, idx) => {
                 const isEven = idx % 2 === 0;
-                const imgUrl = images[idx] || (images.length > 0 ? images[idx % images.length] : '');
+                const imgUrl = chapterImages[idx] || (chapterImages.length > 0 ? chapterImages[idx % chapterImages.length] : '');
                 
                 return (
                   <RevealSection key={idx} className="relative">
@@ -485,11 +508,15 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
               {/* Sticky left panel showing the main hero or first photo */}
               <div className="lg:sticky lg:top-24 space-y-6">
                 <div className="rounded-[2.5rem] overflow-hidden dreamy-shadow border border-white/10 relative">
-                  {images.length > 0 ? (
+                  {hasCover && images.length > 0 ? (
                     <img className="w-full aspect-video lg:aspect-[4/5] object-cover" src={images[0]} alt="Hero Memory" />
                   ) : (
-                    <div className="w-full aspect-video lg:aspect-[4/5] bg-surface-container flex items-center justify-center">
-                      <span className="material-symbols-outlined text-7xl text-primary/30">favorite</span>
+                    <div className="w-full aspect-video lg:aspect-[4/5] bg-gradient-to-br from-primary-container/20 to-secondary-container/20 flex flex-col items-center justify-center p-8 relative">
+                      <div className="absolute inset-0 bg-white/10 backdrop-blur-sm" />
+                      <div className="relative z-10 animate-float shadow-[0_0_30px_rgba(255,94,156,0.25)] rounded-full p-4 bg-white/40 border border-white/20">
+                        <SunflowerDuck size={120} />
+                      </div>
+                      <p className="relative z-10 font-handwriting text-2xl mt-6 text-primary font-bold">Kỷ niệm ngọt ngào</p>
                     </div>
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-6 md:p-8 text-left">
@@ -504,12 +531,12 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
               {/* Scrolling right panel containing the chapters */}
               <div className="space-y-8 text-left">
                 {storyChapters.map((ch, idx) => {
-                  const imgUrl = images[idx + 1] || images[idx] || '';
+                  const imgUrl = chapterImages[idx] || '';
                   return (
                     <RevealSection key={idx} className="glass-panel p-5 md:p-8 rounded-[2rem] border border-white/20 shadow-md hover:shadow-lg transition-shadow">
                       <h3 className="font-h2 text-h2 text-primary mb-4 font-bold">{ch.title || `Chương ${idx + 1}`}</h3>
                       <p className="font-body-lg text-body-lg text-on-surface-variant italic mb-6 leading-relaxed">{ch.content}</p>
-                      {imgUrl && imgUrl !== images[0] && (
+                      {imgUrl && (
                         <div className="rounded-2xl overflow-hidden border border-white/10 shadow-sm mt-4">
                           <img className="w-full aspect-video object-cover" src={imgUrl} alt={ch.title} />
                         </div>

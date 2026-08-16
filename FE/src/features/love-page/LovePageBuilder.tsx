@@ -294,8 +294,8 @@ export const LovePageBuilder: React.FC = () => {
       const filesArray = Array.from(e.target.files);
       const totalImages = selectedImages.length + filesArray.length + existingImages.length;
 
-      if (totalImages > 13) {
-        alert('Chỉ được tải lên tối đa 13 ảnh.');
+      if (totalImages > 50) {
+        alert('Chỉ được tải lên tối đa 50 ảnh.');
         return;
       }
 
@@ -670,10 +670,10 @@ export const LovePageBuilder: React.FC = () => {
             <div className="flex justify-between items-end">
               <div>
                 <h2 className="font-display text-h2 text-on-surface mb-2 font-bold">Hình ảnh kỷ niệm</h2>
-                <p className="text-on-surface-variant font-body-md">Tải lên các hình ảnh đẹp chứa đựng kỷ niệm của hai người (Tối đa 13 ảnh).</p>
+                <p className="text-on-surface-variant font-body-md">Tải lên các hình ảnh đẹp chứa đựng kỷ niệm của hai người (Tối đa 50 ảnh).</p>
               </div>
               <span className="font-label-caps text-xs text-primary px-3 py-1 bg-primary-fixed/40 rounded-full font-bold">
-                Đã chọn: {selectedImages.length + existingImages.length}/13
+                Đã chọn: {selectedImages.length + existingImages.length}/50
               </span>
             </div>
 
@@ -784,7 +784,7 @@ export const LovePageBuilder: React.FC = () => {
                 );
               })}
 
-              {selectedImages.length + existingImages.length < 13 && (
+              {selectedImages.length + existingImages.length < 50 && (
                 <label className="aspect-square border-2 border-dashed border-primary/30 rounded-2xl flex flex-col items-center justify-center gap-2 hover:border-primary hover:bg-primary/5 transition-all cursor-pointer">
                   <span className="material-symbols-outlined text-primary text-3xl">add_a_photo</span>
                   <span className="font-label-caps text-[10px] text-primary uppercase text-center px-4 font-bold">Thêm ảnh</span>
