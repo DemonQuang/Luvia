@@ -145,11 +145,11 @@ export const createTheme = async (req, res) => {
 
         // Process file uploads
         const thumbnail = req.files?.thumbnail?.[0]
-            ? `${process.env.BASE_URL}/uploads/${req.files.thumbnail[0].filename}`
+            ? `/uploads/${req.files.thumbnail[0].filename}`
             : "";
 
         const preview = req.files?.preview?.[0]
-            ? `${process.env.BASE_URL}/uploads/${req.files.preview[0].filename}`
+            ? `/uploads/${req.files.preview[0].filename}`
             : "";
 
         // Parse JSON strings from body (multer submits array fields as strings)
@@ -242,11 +242,11 @@ export const updateTheme = async (req, res) => {
         // Process files
         if (req.files?.thumbnail?.[0]) {
             deleteLocalFile(theme.thumbnail);
-            theme.thumbnail = `${process.env.BASE_URL}/uploads/${req.files.thumbnail[0].filename}`;
+            theme.thumbnail = `/uploads/${req.files.thumbnail[0].filename}`;
         }
         if (req.files?.preview?.[0]) {
             deleteLocalFile(theme.preview);
-            theme.preview = `${process.env.BASE_URL}/uploads/${req.files.preview[0].filename}`;
+            theme.preview = `/uploads/${req.files.preview[0].filename}`;
         }
 
         // Parse JSON strings

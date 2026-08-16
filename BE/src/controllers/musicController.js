@@ -54,7 +54,7 @@ export const createMusic = async (req, res) => {
         }
 
         let fileUrl = req.files?.file?.[0]
-            ? `${process.env.BASE_URL}/uploads/${req.files.file[0].filename}`
+            ? `/uploads/${req.files.file[0].filename}`
             : "";
 
         if (!fileUrl && req.body.fileUrl) {
@@ -66,7 +66,7 @@ export const createMusic = async (req, res) => {
         }
 
         let thumbnailUrl = req.files?.thumbnail?.[0]
-            ? `${process.env.BASE_URL}/uploads/${req.files.thumbnail[0].filename}`
+            ? `/uploads/${req.files.thumbnail[0].filename}`
             : "";
 
         if (!thumbnailUrl && req.body.thumbnailUrl) {
@@ -106,7 +106,7 @@ export const updateMusic = async (req, res) => {
 
         if (req.files?.file?.[0]) {
             deleteLocalFile(music.file);
-            music.file = `${process.env.BASE_URL}/uploads/${req.files.file[0].filename}`;
+            music.file = `/uploads/${req.files.file[0].filename}`;
         } else if (req.body.fileUrl !== undefined && req.body.fileUrl !== music.file) {
             deleteLocalFile(music.file);
             music.file = req.body.fileUrl;
@@ -114,7 +114,7 @@ export const updateMusic = async (req, res) => {
 
         if (req.files?.thumbnail?.[0]) {
             deleteLocalFile(music.thumbnail);
-            music.thumbnail = `${process.env.BASE_URL}/uploads/${req.files.thumbnail[0].filename}`;
+            music.thumbnail = `/uploads/${req.files.thumbnail[0].filename}`;
         } else if (req.body.thumbnailUrl !== undefined && req.body.thumbnailUrl !== music.thumbnail) {
             deleteLocalFile(music.thumbnail);
             music.thumbnail = req.body.thumbnailUrl;

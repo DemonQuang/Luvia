@@ -16,12 +16,12 @@ const createLove = async (req, res) => {
         const imageUrls =
             req.files?.images?.map(
                 (file) =>
-                    `${process.env.BASE_URL}/uploads/${file.filename}`
+                    `/uploads/${file.filename}`
             ) || [];
 
         const musicUrl =
             req.files?.music?.[0]
-                ? `${process.env.BASE_URL}/uploads/${req.files.music[0].filename}`
+                ? `/uploads/${req.files.music[0].filename}`
                 : "";
 
         let content = {};
@@ -203,12 +203,12 @@ const updateLove = async (req, res) => {
         const imageUrls =
             req.files?.images?.map(
                 (file) =>
-                    `${process.env.BASE_URL}/uploads/${file.filename}`
+                    `/uploads/${file.filename}`
             ) || [];
 
         const musicUrl =
             req.files?.music?.[0]
-                ? `${process.env.BASE_URL}/uploads/${req.files.music[0].filename}`
+                ? `/uploads/${req.files.music[0].filename}`
                 : "";
 
         let content;
