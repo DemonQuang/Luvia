@@ -17,6 +17,9 @@ export const getSharePage = async (req, res) => {
         const { slug } = req.params;
         const page = await Love.findOne({ slug });
 
+        const frontendUrl = process.env.FRONTEND_URL || 
+            (process.env.BASE_URL && !process.env.BASE_URL.includes(':3000') ? process.env.BASE_URL : "http://localhost:5173");
+
         if (!page) {
             return res.status(404).send(`
                 <html>
@@ -24,7 +27,7 @@ export const getSharePage = async (req, res) => {
                     <body style="font-family: sans-serif; text-align: center; padding: 50px;">
                         <h2>Không tìm thấy trang kỷ niệm</h2>
                         <p>Đường liên kết không tồn tại hoặc đã bị xóa.</p>
-                        <a href="${escapeHtml(process.env.FRONTEND_URL || "http://localhost:5173")}">Về trang chủ Luvia</a>
+                        <a href="${escapeHtml(frontendUrl)}">Về trang chủ Luvia</a>
                     </body>
                 </html>
             `);
@@ -35,7 +38,7 @@ export const getSharePage = async (req, res) => {
         const shareTitle = `💌 Một lời nhắn gửi đến ${recipient}`;
         const description = escapeHtml(page.content?.messages?.[0] || "Một trang kỷ niệm đầy ắp những khoảnh khắc đáng nhớ và những lời chúc chân thành.");
         const image = escapeHtml(page.content?.images?.[0] || `${process.env.BASE_URL}/uploads/default-og.png`);
-        const redirectUrl = `${process.env.FRONTEND_URL || "http://localhost:5173"}/page/${slug}`;
+        const redirectUrl = `${frontendUrl}/page/${slug}`;
 
         // Return HTML containing Open Graph tags and immediate client redirect
         res.status(200).send(`
