@@ -363,12 +363,30 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
           </div>
           <RevealSection className="relative z-10 text-center max-w-4xl">
             {!mainCoverImage && (
-              <div className="flex justify-center mb-8 relative select-none">
+              <div className="flex justify-center mb-12 relative select-none">
                 {/* Glowing background halo */}
-                <div className="absolute inset-0 w-36 h-36 bg-primary/25 rounded-full filter blur-xl animate-pulse mx-auto" />
-                {/* Floating duck component */}
-                <div className="relative animate-float shadow-[0_0_35px_rgba(255,94,156,0.3)] rounded-full p-2.5 bg-white/40 backdrop-blur-sm border border-white/20">
-                  <SunflowerDuck size={110} />
+                <div className="absolute inset-0 w-48 h-48 bg-primary/20 rounded-full filter blur-2xl animate-pulse mx-auto" />
+                
+                {/* Central main duck */}
+                <div className="relative z-10 animate-float shadow-[0_0_35px_rgba(255,94,156,0.35)] rounded-[2rem] overflow-hidden p-3 bg-white/40 backdrop-blur-md border border-white/30 w-36 h-36 flex items-center justify-center">
+                  <img src="/ducks/duck4.jpg" alt="Cute Duck" className="w-full h-full object-cover rounded-2xl" />
+                </div>
+
+                {/* Orbiting / scattered floating ducks */}
+                <div className="absolute -left-12 top-4 animate-float [animation-delay:1s] shadow-[0_0_20px_rgba(255,94,156,0.25)] rounded-full overflow-hidden p-1.5 bg-white/50 border border-white/20 w-16 h-16">
+                  <img src="/ducks/duck1.jpg" alt="Cute Duck 1" className="w-full h-full object-cover rounded-full" />
+                </div>
+                
+                <div className="absolute -right-12 -top-6 animate-float [animation-delay:2s] shadow-[0_0_20px_rgba(255,94,156,0.25)] rounded-full overflow-hidden p-1.5 bg-white/50 border border-white/20 w-14 h-14">
+                  <img src="/ducks/duck2.jpg" alt="Cute Duck 2" className="w-full h-full object-cover rounded-full" />
+                </div>
+
+                <div className="absolute -left-6 -bottom-8 animate-float [animation-delay:3s] shadow-[0_0_20px_rgba(255,94,156,0.25)] rounded-full overflow-hidden p-1.5 bg-white/50 border border-white/20 w-14 h-14">
+                  <img src="/ducks/duck3.jpg" alt="Cute Duck 3" className="w-full h-full object-cover rounded-full" />
+                </div>
+
+                <div className="absolute -right-8 bottom-2 animate-float [animation-delay:1.5s] shadow-[0_0_20px_rgba(255,94,156,0.25)] rounded-full overflow-hidden p-1.5 bg-white/50 border border-white/20 w-16 h-16">
+                  <img src="/ducks/duck5.jpg" alt="Cute Duck 5" className="w-full h-full object-cover rounded-full" />
                 </div>
               </div>
             )}
@@ -511,12 +529,32 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
                   {hasCover && images.length > 0 ? (
                     <img className="w-full aspect-video lg:aspect-[4/5] object-cover" src={images[0]} alt="Hero Memory" />
                   ) : (
-                    <div className="w-full aspect-video lg:aspect-[4/5] bg-gradient-to-br from-primary-container/20 to-secondary-container/20 flex flex-col items-center justify-center p-8 relative">
+                    <div className="w-full aspect-video lg:aspect-[4/5] bg-gradient-to-br from-primary-container/20 to-secondary-container/20 flex flex-col items-center justify-center p-8 relative overflow-hidden">
                       <div className="absolute inset-0 bg-white/10 backdrop-blur-sm" />
-                      <div className="relative z-10 animate-float shadow-[0_0_30px_rgba(255,94,156,0.25)] rounded-full p-4 bg-white/40 border border-white/20">
-                        <SunflowerDuck size={120} />
+                      
+                      {/* Main Duck */}
+                      <div className="relative z-10 animate-float shadow-[0_0_30px_rgba(255,94,156,0.3)] rounded-3xl overflow-hidden p-2 bg-white/50 border border-white/30 w-40 h-40">
+                        <img src="/ducks/duck4.jpg" alt="Main Duck" className="w-full h-full object-cover rounded-2xl" />
                       </div>
-                      <p className="relative z-10 font-handwriting text-2xl mt-6 text-primary font-bold">Kỷ niệm ngọt ngào</p>
+
+                      {/* Small floating ducks */}
+                      <div className="absolute left-8 top-12 animate-float [animation-delay:1s] shadow-[0_0_20px_rgba(255,94,156,0.25)] rounded-full overflow-hidden p-1 bg-white/50 border border-white/20 w-16 h-16">
+                        <img src="/ducks/duck1.jpg" alt="Duck 1" className="w-full h-full object-cover rounded-full" />
+                      </div>
+                      
+                      <div className="absolute right-8 top-16 animate-float [animation-delay:2s] shadow-[0_0_20px_rgba(255,94,156,0.25)] rounded-full overflow-hidden p-1 bg-white/50 border border-white/20 w-14 h-14">
+                        <img src="/ducks/duck2.jpg" alt="Duck 2" className="w-full h-full object-cover rounded-full" />
+                      </div>
+
+                      <div className="absolute left-10 bottom-24 animate-float [animation-delay:3s] shadow-[0_0_20px_rgba(255,94,156,0.25)] rounded-full overflow-hidden p-1 bg-white/50 border border-white/20 w-14 h-14">
+                        <img src="/ducks/duck3.jpg" alt="Duck 3" className="w-full h-full object-cover rounded-full" />
+                      </div>
+
+                      <div className="absolute right-12 bottom-20 animate-float [animation-delay:1.5s] shadow-[0_0_20px_rgba(255,94,156,0.25)] rounded-full overflow-hidden p-1 bg-white/50 border border-white/20 w-16 h-16">
+                        <img src="/ducks/duck5.jpg" alt="Duck 5" className="w-full h-full object-cover rounded-full" />
+                      </div>
+
+                      <p className="relative z-10 font-handwriting text-2xl mt-8 text-primary font-bold">Kỷ niệm ngọt ngào</p>
                     </div>
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-6 md:p-8 text-left">
