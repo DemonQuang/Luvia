@@ -68,6 +68,13 @@ export const LetterPage: React.FC = () => {
   const music = content?.music || themeConfig?.defaultMusic || '';
   const lastMessage = messages[messages.length - 1] || "Mãi yêu em!";
 
+  const letterDate = useMemo(() => {
+    const raw = lovePage?.updatedAt || lovePage?.createdAt;
+    if (!raw) return new Date().toLocaleDateString('vi-VN');
+    const d = new Date(raw);
+    return isNaN(d.getTime()) ? new Date().toLocaleDateString('vi-VN') : d.toLocaleDateString('vi-VN');
+  }, [lovePage?.updatedAt, lovePage?.createdAt]);
+
   // Fetch theme configuration when lovePage changes
   useEffect(() => {
     if (!lovePage) return;
@@ -595,7 +602,7 @@ export const LetterPage: React.FC = () => {
               </span>
             </div>
             <span className="text-[11px] sm:text-xs text-stone-500 italic">
-              {new Date().toLocaleDateString('vi-VN')}
+              {letterDate}
             </span>
           </div>
 
