@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { useMusic } from '../../store/music.store';
+import { FloatingMusicPlayer } from '../../components/common/FloatingMusicPlayer';
+import { ImageLightbox } from '../../components/common/ImageLightbox';
 
 interface CosmicGalleryProps {
   images: string[];
@@ -13,104 +14,81 @@ interface CosmicGalleryProps {
 
 const CosmicGalleryInner: React.FC<CosmicGalleryProps> = ({ images, title, music, onNext, onBack }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [typewriterText, setTypewriterText] = useState('');
-  const { isPlaying, progress: audioProgress, togglePlay, playMusic, pauseMusic, currentMusic } = useMusic();
+  const [titleFinished, setTitleFinished] = useState(false);
+  const [showSpecialStarModal, setShowSpecialStarModal] = useState(false);
+
+  // Discovery / Zoom State Machine (Zoom In from deep black void into universe)
+  const [isRevealed, setIsRevealed] = useState(false);
+  const [zoomProgress, setZoomProgress] = useState(0); // 0 to 100
+  const [discoveryState, setDiscoveryState] = useState<'start' | 'zooming' | 'revealed'>('start');
+  const [showCelebrationToast, setShowCelebrationToast] = useState(false);
+
+  // References to control camera animation externally
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const controlsRef = useRef<OrbitControls | null>(null);
+  const isAnimatingRef = useRef(false);
 
   const recipientName = title || 'chúng ta';
   const fullText = `Hành tinh mang tên ${recipientName}`;
 
+  // Typewriter effect
   useEffect(() => {
     let i = 0;
     setTypewriterText('');
+    setTitleFinished(false);
     const interval = setInterval(() => {
       if (i < fullText.length) {
         setTypewriterText(fullText.slice(0, i + 1));
         i++;
       } else {
         clearInterval(interval);
+        setTimeout(() => {
+          setTitleFinished(true);
+        }, 300);
       }
     }, 60);
     return () => clearInterval(interval);
   }, [fullText]);
 
-  // Music player
-  useEffect(() => {
-    if (music) {
-      if (music !== currentMusic) {
-        playMusic(music);
+  // Smooth auto-reveal animation helper (Flies from deep void ~115 down to 21)
+  const handleAutoDiscover = useCallback(() => {
+    if (!cameraRef.current || !controlsRef.current || isAnimatingRef.current) return;
+
+    isAnimatingRef.current = true;
+    const camera = cameraRef.current;
+    const startPos = camera.position.clone();
+    const targetPos = new THREE.Vector3(0, 4, 50);
+    const duration = 2600; // 2.6 seconds
+    const startTime = performance.now();
+
+    const animateZoom = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // EaseInOutCubic
+      const ease = progress < 0.5
+        ? 4 * progress * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+      camera.position.lerpVectors(startPos, targetPos, ease);
+
+      if (progress < 1) {
+        requestAnimationFrame(animateZoom);
+      } else {
+        camera.position.copy(targetPos);
+        isAnimatingRef.current = false;
+        setIsRevealed(true);
+        setDiscoveryState('revealed');
+        setShowCelebrationToast(true);
+        setTimeout(() => setShowCelebrationToast(false), 6000);
       }
-    } else {
-      pauseMusic();
-    }
-
-    return () => {
-      // Pause music if we are leaving the love page views
-      if (!window.location.pathname.startsWith('/page/')) {
-        pauseMusic();
-      }
     };
-  }, [music, currentMusic, playMusic, pauseMusic]);
 
-  // Music floater state
-  const [musicExpanded, setMusicExpanded] = useState(false);
-  const [musicPos, setMusicPos] = useState({ x: 24, y: 24 });
-  const musicDragRef = useRef({ dragging: false, moved: false, startX: 0, startY: 0, startPosX: 0, startPosY: 0 });
-
-  const handleMusicMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    const d = musicDragRef.current;
-    d.dragging = true;
-    d.moved = false;
-    d.startX = e.clientX;
-    d.startY = e.clientY;
-    d.startPosX = musicPos.x;
-    d.startPosY = musicPos.y;
-
-    const handleMove = (ev: MouseEvent) => {
-      if (!d.dragging) return;
-      const dx = ev.clientX - d.startX;
-      const dy = ev.clientY - d.startY;
-      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) d.moved = true;
-      setMusicPos({ x: d.startPosX + dx, y: d.startPosY + dy });
-    };
-    const handleUp = () => { d.dragging = false; window.removeEventListener('mousemove', handleMove); window.removeEventListener('mouseup', handleUp); };
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
-  }, [musicPos.x, musicPos.y]);
-
-  const handleMusicTouchStart = useCallback((e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    const d = musicDragRef.current;
-    d.dragging = true;
-    d.moved = false;
-    d.startX = touch.clientX;
-    d.startY = touch.clientY;
-    d.startPosX = musicPos.x;
-    d.startPosY = musicPos.y;
-
-    const handleMove = (ev: TouchEvent) => {
-      const t = ev.touches[0];
-      const dx = t.clientX - d.startX;
-      const dy = t.clientY - d.startY;
-      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) d.moved = true;
-      setMusicPos({ x: d.startPosX + dx, y: d.startPosY + dy });
-    };
-    const handleEnd = () => { d.dragging = false; window.removeEventListener('touchmove', handleMove); window.removeEventListener('touchend', handleEnd); };
-    window.addEventListener('touchmove', handleMove);
-    window.addEventListener('touchend', handleEnd);
-  }, [musicPos.x, musicPos.y]);
-
-  const handleNoteClick = useCallback(() => {
-    if (!musicDragRef.current.moved) setMusicExpanded(p => !p);
+    requestAnimationFrame(animateZoom);
   }, []);
 
-  const handlePlayClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    togglePlay();
-  }, [togglePlay]);
-
-  // Three.js
+  // Three.js Scene Setup
   useEffect(() => {
     if (!containerRef.current || images.length === 0) return;
 
@@ -119,12 +97,15 @@ const CosmicGalleryInner: React.FC<CosmicGalleryProps> = ({ images, title, music
     const height = container.clientHeight;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x160016);
+    // Deep black cosmic void
+    scene.background = new THREE.Color(0x040006);
 
+    // Initial Camera: Placed far away in the deep dark void (distance ~ 115)
     const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
-    camera.position.set(0, 4, 21);
+    camera.position.set(0, 18, 115);
+    cameraRef.current = camera;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
@@ -133,11 +114,109 @@ const CosmicGalleryInner: React.FC<CosmicGalleryProps> = ({ images, title, music
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.minDistance = 5;
-    controls.maxDistance = 50;
+    controls.maxDistance = 140;
     controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.8;
+    controls.autoRotateSpeed = 0.4;
     controls.enablePan = false;
+    controlsRef.current = controls;
 
+    // Root galaxy container for smooth scaling
+    const galaxyContainer = new THREE.Group();
+    scene.add(galaxyContainer);
+
+    // --- 1. Delicate Central Star of the Galaxy ---
+    const centralStarGroup = new THREE.Group();
+    galaxyContainer.add(centralStarGroup);
+
+    // Core Glowing Sphere (Delicate, not oversized)
+    const starCoreGeo = new THREE.SphereGeometry(0.18, 32, 32);
+    const starCoreMat = new THREE.MeshBasicMaterial({
+      color: 0xfff8b3,
+      transparent: true,
+      opacity: 1,
+    });
+    const starCore = new THREE.Mesh(starCoreGeo, starCoreMat);
+    centralStarGroup.add(starCore);
+
+    // Inner Glowing Aura
+    const starAuraGeo = new THREE.SphereGeometry(0.36, 32, 32);
+    const starAuraMat = new THREE.MeshBasicMaterial({
+      color: 0xff3385,
+      transparent: true,
+      opacity: 0.8,
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+    });
+    const starAura = new THREE.Mesh(starAuraGeo, starAuraMat);
+    centralStarGroup.add(starAura);
+
+    // Delicate Corona Ring
+    const coronaGeo = new THREE.RingGeometry(0.45, 0.75, 48);
+    const coronaMat = new THREE.MeshBasicMaterial({
+      color: 0xffd11a,
+      transparent: true,
+      opacity: 0.65,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+    });
+    const coronaRing = new THREE.Mesh(coronaGeo, coronaMat);
+    coronaRing.rotation.x = Math.PI / 3;
+    centralStarGroup.add(coronaRing);
+
+    // Second Delicate Corona Ring
+    const corona2Geo = new THREE.RingGeometry(0.6, 0.95, 48);
+    const corona2Mat = new THREE.MeshBasicMaterial({
+      color: 0xff66cc,
+      transparent: true,
+      opacity: 0.45,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+    });
+    const corona2Ring = new THREE.Mesh(corona2Geo, corona2Mat);
+    corona2Ring.rotation.y = Math.PI / 4;
+    centralStarGroup.add(corona2Ring);
+
+    // --- 2. The Distant Shining Planet ("Hành tinh mang tên em") ---
+    const distantPlanetGroup = new THREE.Group();
+    distantPlanetGroup.position.set(13, 5, -12);
+    galaxyContainer.add(distantPlanetGroup);
+
+    // Distant Star Core
+    const distantPlanetGeo = new THREE.SphereGeometry(0.35, 32, 32);
+    const distantPlanetMat = new THREE.MeshBasicMaterial({
+      color: 0xffe066,
+      transparent: true,
+      opacity: 0.3,
+    });
+    const distantPlanetMesh = new THREE.Mesh(distantPlanetGeo, distantPlanetMat);
+    distantPlanetGroup.add(distantPlanetMesh);
+
+    // Distant Star Pulsing Aura
+    const distantAuraGeo = new THREE.SphereGeometry(0.65, 32, 32);
+    const distantAuraMat = new THREE.MeshBasicMaterial({
+      color: 0xff3399,
+      transparent: true,
+      opacity: 0.2,
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+    });
+    const distantAuraMesh = new THREE.Mesh(distantAuraGeo, distantAuraMat);
+    distantPlanetGroup.add(distantAuraMesh);
+
+    // Distant Star Planetary Halo Ring
+    const distantRingGeo = new THREE.RingGeometry(0.7, 1.1, 48);
+    const distantRingMat = new THREE.MeshBasicMaterial({
+      color: 0xff99ff,
+      transparent: true,
+      opacity: 0.2,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+    });
+    const distantRingMesh = new THREE.Mesh(distantRingGeo, distantRingMat);
+    distantRingMesh.rotation.x = Math.PI / 2.5;
+    distantPlanetGroup.add(distantRingMesh);
+
+    // --- 3. Galaxy Particle Field (Milky Way / Nebula) ---
     const sizes: number[] = [];
     const shift: number[] = [];
     const pts: THREE.Vector3[] = [];
@@ -172,7 +251,11 @@ const CosmicGalleryInner: React.FC<CosmicGalleryProps> = ({ images, title, music
     g.setAttribute('shift', new THREE.Float32BufferAttribute(shift, 4));
 
     const m = new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uSize: { value: 0.1 } },
+      uniforms: {
+        uTime: { value: 0 },
+        uSize: { value: 0.05 },
+        uOpacity: { value: 0.05 },
+      },
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
@@ -199,16 +282,17 @@ const CosmicGalleryInner: React.FC<CosmicGalleryProps> = ({ images, title, music
 
           float d = length(abs(position) / vec3(40.0, 10.0, 40.0));
           d = clamp(d, 0.0, 1.0);
-          vColor = mix(vec3(227.0, 155.0, 0.0), vec3(100.0, 50.0, 255.0), d) / 255.0;
+          vColor = mix(vec3(255.0, 180.0, 50.0), vec3(160.0, 70.0, 255.0), d) / 255.0;
         }
       `,
       fragmentShader: `
+        uniform float uOpacity;
         varying vec3 vColor;
 
         void main() {
           float d = length(gl_PointCoord.xy - 0.5);
           if (d > 0.5) discard;
-          gl_FragColor = vec4(vColor, smoothstep(0.5, 0.2, d) * 0.5 + 0.5);
+          gl_FragColor = vec4(vColor, (smoothstep(0.5, 0.2, d) * 0.5 + 0.5) * uOpacity);
         }
       `,
     });
@@ -216,23 +300,30 @@ const CosmicGalleryInner: React.FC<CosmicGalleryProps> = ({ images, title, music
     const p = new THREE.Points(g, m);
     p.rotation.order = 'ZYX';
     p.rotation.z = 0.2;
-    scene.add(p);
+    galaxyContainer.add(p);
 
+    // --- 4. Photo Planet Cards (Planes orbiting) ---
     const imageMeshes: THREE.Mesh[] = [];
     const imageFloats: { mesh: THREE.Mesh; baseY: number; phase: number }[] = [];
     const textureLoader = new THREE.TextureLoader();
 
+    const uniformSize = 2.4;
+    const geometry = new THREE.PlaneGeometry(uniformSize, uniformSize);
+
     images.forEach((imgUrl) => {
       const texture = textureLoader.load(imgUrl);
-      const size = 1.8 + Math.random() * 1.2;
-      const geometry = new THREE.PlaneGeometry(size, size);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.minFilter = THREE.LinearFilter;
+
       const material = new THREE.MeshBasicMaterial({
         map: texture,
         transparent: true,
+        opacity: 0, // Initially invisible when far away
         side: THREE.DoubleSide,
         depthWrite: false,
       });
       const mesh = new THREE.Mesh(geometry, material);
+      mesh.scale.set(0, 0, 0); // Initially scaled down when far away
 
       const radius = 8 + Math.random() * 5;
       const theta = Math.random() * Math.PI * 2;
@@ -246,11 +337,12 @@ const CosmicGalleryInner: React.FC<CosmicGalleryProps> = ({ images, title, music
       mesh.lookAt(0, 0, 0);
       mesh.rotation.z = Math.random() * Math.PI;
 
-      scene.add(mesh);
+      galaxyContainer.add(mesh);
       imageMeshes.push(mesh);
       imageFloats.push({ mesh, baseY: pos.y, phase: Math.random() * Math.PI * 2 });
     });
 
+    // --- 5. Raycaster for clicking photos & special star ---
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
 
@@ -260,28 +352,108 @@ const CosmicGalleryInner: React.FC<CosmicGalleryProps> = ({ images, title, music
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
       raycaster.setFromCamera(pointer, camera);
-      const intersects = raycaster.intersectObjects(imageMeshes);
 
+      // Check if clicking central mystery star when far away
+      const starHits = raycaster.intersectObjects([starCore, starAura]);
+      if (starHits.length > 0 && camera.position.length() > 30) {
+        handleAutoDiscover();
+        return;
+      }
+
+      // Check if clicking the distant shining planet
+      const distantHits = raycaster.intersectObjects([distantPlanetMesh, distantAuraMesh]);
+      if (distantHits.length > 0) {
+        setShowSpecialStarModal(true);
+        return;
+      }
+
+      // Check photo planes
+      const intersects = raycaster.intersectObjects(imageMeshes);
       if (intersects.length > 0) {
         const hit = intersects[0].object as THREE.Mesh;
         const idx = imageMeshes.indexOf(hit);
-        if (idx >= 0) setSelectedImage(images[idx]);
+        if (idx >= 0) setSelectedIndex(idx);
       }
     };
 
     container.addEventListener('click', handleClick);
 
+    // --- 6. Animation Render Loop & Deep Void Zoom-In State Tracking ---
     const clock = new THREE.Clock();
     let animationId: number;
+    let localRevealed = false;
 
     const animate = () => {
       animationId = requestAnimationFrame(animate);
       const elapsed = clock.getElapsedTime();
       const t = elapsed * 0.5;
 
+      // Pulse Central Star
+      const pulse = Math.sin(elapsed * 4) * 0.08 + 1;
+      starCore.scale.set(pulse, pulse, pulse);
+      starAura.scale.set(pulse * 1.15, pulse * 1.15, pulse * 1.15);
+      coronaRing.rotation.z += 0.01;
+      corona2Ring.rotation.z -= 0.008;
+
+      // Rotate and Pulse the Distant Planet ("Hành tinh mang tên em")
+      const distantPulse = Math.sin(elapsed * 2.5) * 0.12 + 1;
+      distantPlanetMesh.scale.set(distantPulse, distantPulse, distantPulse);
+      distantAuraMesh.scale.set(distantPulse * 1.25, distantPulse * 1.25, distantPulse * 1.25);
+      distantRingMesh.rotation.z += 0.006;
+
+      // Measure camera distance from universe center (0, 0, 0)
+      // Deep void distance = 115.0, Reveal distance = 48.0
+      const camDist = camera.position.distanceTo(controls.target);
+      const startDist = 115.0;
+      const revealDist = 48.0;
+      const rawProgress = Math.min(Math.max((startDist - camDist) / (startDist - revealDist), 0), 1);
+      const progressPercent = localRevealed ? 100 : Math.round(rawProgress * 100);
+
+      setZoomProgress(progressPercent);
+
+      // Trigger success as soon as progress reaches 80%
+      if (rawProgress >= 0.80 && !localRevealed) {
+        localRevealed = true;
+        setIsRevealed(true);
+        setDiscoveryState('revealed');
+        setShowCelebrationToast(true);
+        setTimeout(() => setShowCelebrationToast(false), 6000);
+      } else if (!localRevealed) {
+        if (rawProgress < 0.15) {
+          setDiscoveryState('start');
+        } else {
+          setDiscoveryState('zooming');
+        }
+      }
+
+      // Visual scaling normalized (100% crisp when revealed or >= 80%)
+      const visualFactor = localRevealed ? 1.0 : Math.min(rawProgress / 0.80, 1);
+
+      // When far away, whole galaxy scales down like a single twinkling dot in the deep black void
+      const galaxyScale = 0.08 + visualFactor * 0.92;
+      galaxyContainer.scale.set(galaxyScale, galaxyScale, galaxyScale);
+
+      // Dynamic scaling of Galaxy Shader and Photo Meshes based on Zoom-In Progress
       m.uniforms.uTime.value = t * Math.PI;
+      m.uniforms.uSize.value = 0.03 + visualFactor * 0.07;
+      m.uniforms.uOpacity.value = 0.08 + visualFactor * 0.92;
       p.rotation.y = t * 0.05;
 
+      // Distant Planet Opacity & Scaling
+      distantPlanetMat.opacity = 0.2 + visualFactor * 0.8;
+      distantAuraMat.opacity = 0.1 + visualFactor * 0.65;
+      distantRingMat.opacity = 0.1 + visualFactor * 0.55;
+
+      // Scale & fade photo cards based on discovery progress (reveal as user zooms in)
+      imageMeshes.forEach((mesh) => {
+        const s = visualFactor;
+        mesh.scale.set(s, s, s);
+        if (mesh.material && !Array.isArray(mesh.material)) {
+          (mesh.material as THREE.MeshBasicMaterial).opacity = visualFactor;
+        }
+      });
+
+      // Float photo planes
       imageFloats.forEach((data) => {
         data.mesh.position.y = data.baseY + Math.sin(elapsed * 0.3 + data.phase) * 0.3;
         data.mesh.rotation.z += 0.002;
@@ -311,122 +483,165 @@ const CosmicGalleryInner: React.FC<CosmicGalleryProps> = ({ images, title, music
       }
       g.dispose();
       (m as THREE.ShaderMaterial).dispose();
+      geometry.dispose();
+      starCoreGeo.dispose();
+      starCoreMat.dispose();
+      starAuraGeo.dispose();
+      starAuraMat.dispose();
+      coronaGeo.dispose();
+      coronaMat.dispose();
+      corona2Geo.dispose();
+      corona2Mat.dispose();
+      distantPlanetGeo.dispose();
+      distantPlanetMat.dispose();
+      distantAuraGeo.dispose();
+      distantAuraMat.dispose();
+      distantRingGeo.dispose();
+      distantRingMat.dispose();
       imageMeshes.forEach(mesh => {
-        mesh.geometry.dispose();
         const mat = mesh.material;
         if (Array.isArray(mat)) mat.forEach(m => m.dispose());
         else mat.dispose();
       });
     };
-  }, [images]);
+  }, [images, handleAutoDiscover]);
 
-  const handleCloseModal = useCallback(() => setSelectedImage(null), []);
+  const handleCloseModal = useCallback(() => setSelectedIndex(null), []);
 
   if (images.length === 0) return null;
 
   return (
-    <section className="relative w-full h-screen overflow-hidden bg-[#160016]">
-      {/* Full-width Glassmorphic Header */}
-      <div className="fixed top-0 left-0 right-0 z-50 h-16 bg-black/40 backdrop-blur-md px-4 md:px-6 flex items-center justify-between shadow-lg pointer-events-auto w-full">
+    <section className="relative w-full h-screen overflow-hidden bg-[#040006] select-none">
+      {/* Top Glassmorphic Header */}
+      <div className="fixed top-0 left-0 right-0 z-50 h-16 bg-black/40 backdrop-blur-md px-3 sm:px-6 flex items-center justify-between shadow-lg pointer-events-auto w-full transition-all duration-500">
         {/* Left: Back button */}
         {onBack ? (
           <button
             onClick={onBack}
-            className="flex items-center justify-center gap-1.5 px-3 py-1.5 md:px-4 md:py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white transition-all text-xs font-semibold active:scale-95"
+            className="flex items-center justify-center gap-1 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-white/90 hover:text-white transition-all text-xs sm:text-sm font-semibold active:scale-95 whitespace-nowrap shadow-sm cursor-pointer"
           >
-            <span className="material-symbols-outlined text-base">arrow_back</span>
+            <span className="material-symbols-outlined text-sm sm:text-base">arrow_back</span>
             <span className="hidden sm:inline">Quay lại</span>
           </button>
-        ) : <div className="w-[84px] sm:w-[110px]" />}
+        ) : <div className="w-[60px] sm:w-[100px]" />}
 
         {/* Center: Title & Subtitle */}
         <div className="flex flex-col items-center text-center max-w-[50%] md:max-w-[60%]">
-          <h1 className="text-sm md:text-lg font-bold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-pink-400 via-fuchsia-400 to-purple-400 font-display">
+          <h1 className="text-xs sm:text-base md:text-lg font-bold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-pink-400 via-fuchsia-400 to-purple-400 font-display line-clamp-1">
             {typewriterText}
             <span className="animate-pulse ml-0.5 text-fuchsia-400">|</span>
           </h1>
           {fullText === typewriterText && (
             <p className="text-[9px] md:text-xs text-white/50 font-light mt-0.5 line-clamp-1 italic animate-fade-in">
-              Mỗi bức ảnh là một hành tinh chứa đầy kỷ niệm
+              {isRevealed ? 'Mỗi bức ảnh là một hành tinh chứa đầy kỷ niệm ✨' : 'Dù ở rất xa, anh vẫn luôn tìm thấy em ✨'}
             </p>
           )}
         </div>
 
-        {/* Right: Next button */}
-        {onNext ? (
+        {/* Right: Next button (ONLY REVEALED ONCE UNIVERSE IS DISCOVERED) */}
+        {onNext && isRevealed ? (
           <button
             onClick={onNext}
-            className="flex items-center justify-center gap-1.5 px-3 py-1.5 md:px-4 md:py-2 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 hover:opacity-90 border border-pink-400/20 text-white transition-all text-xs font-semibold shadow-[0_0_15px_rgba(236,72,153,0.3)] hover:shadow-[0_0_25px_rgba(236,72,153,0.5)] active:scale-95"
+            className="flex items-center justify-center gap-1.5 px-4 py-2 sm:px-5 sm:py-2.5 rounded-full bg-gradient-to-r from-pink-500 via-rose-500 to-purple-600 hover:opacity-95 border border-pink-300/40 text-white transition-all text-xs sm:text-sm font-semibold shadow-[0_0_25px_rgba(236,72,153,0.45)] hover:shadow-[0_0_35px_rgba(236,72,153,0.7)] active:scale-95 whitespace-nowrap cursor-pointer animate-in fade-in zoom-in-95 duration-500"
           >
-            <span>Tiếp theo</span>
-            <span className="material-symbols-outlined text-base">arrow_forward</span>
+            <span>Tiếp tới</span>
+            <span className="material-symbols-outlined text-sm sm:text-base">arrow_forward</span>
           </button>
-        ) : <div className="w-[84px] sm:w-[110px]" />}
+        ) : <div className="w-[60px] sm:w-[100px]" />}
       </div>
 
+      {/* 3D WebGL Canvas */}
       <div
         ref={containerRef}
         className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing"
       />
 
-      {/* Music player */}
-      {music && (
-        <div className="fixed z-50" style={{ left: musicPos.x, bottom: musicPos.y }}>
-          {!musicExpanded && (
-            <div
-              onClick={handleNoteClick}
-              onMouseDown={handleMusicMouseDown}
-              onTouchStart={handleMusicTouchStart}
-              className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center hover:bg-white/20 transition-all cursor-grab active:cursor-grabbing relative overflow-hidden shadow-lg"
+      {/* --- INITIAL GUIDANCE PILL (ONLY SHOWN AFTER TITLE LOADS & BEFORE USER ZOOMS) --- */}
+      {!isRevealed && titleFinished && discoveryState === 'start' && zoomProgress < 10 && (
+        <div className="fixed top-[72px] sm:top-20 left-1/2 -translate-x-1/2 z-40 pointer-events-auto animate-in fade-in slide-in-from-top-2 duration-400 max-w-[94vw] w-max">
+          <div className="px-3.5 py-1.5 sm:px-5 sm:py-2.5 rounded-full bg-[#180520]/90 border border-pink-400/50 backdrop-blur-xl shadow-[0_8px_30px_rgba(0,0,0,0.6)] flex items-center gap-2 sm:gap-2.5">
+            <span className="material-symbols-outlined text-base sm:text-lg text-yellow-300 animate-bounce flex-shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>
+              stars
+            </span>
+            <span className="text-[11px] sm:text-sm text-white font-medium truncate">
+              Có 1 phần quà khi bé zoom vào
+            </span>
+            <button
+              type="button"
+              onClick={handleAutoDiscover}
+              className="px-2.5 py-1 sm:px-3 sm:py-1 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 hover:opacity-90 text-white text-[11px] sm:text-xs font-semibold flex-shrink-0 shadow-md active:scale-95 transition-all cursor-pointer flex items-center gap-1"
             >
-              <div className={`absolute inset-0 bg-primary/20 rounded-full ${isPlaying ? 'animate-spin' : ''}`} style={{ animationDuration: '3s' }} />
-              <span className="material-symbols-outlined text-white text-xl relative z-10 pointer-events-none">music_note</span>
-            </div>
-          )}
-
-          {musicExpanded && (
-            <div className="bg-[#16213e]/90 backdrop-blur-md dreamy-shadow rounded-full px-6 py-3 flex items-center justify-between gap-4 border border-white/10 relative overflow-hidden shadow-lg max-w-xs">
-              <div
-                onClick={handleNoteClick}
-                onMouseDown={handleMusicMouseDown}
-                onTouchStart={handleMusicTouchStart}
-                className="flex items-center gap-4 flex-1 min-w-0 cursor-grab active:cursor-grabbing"
-              >
-                <div className="w-10 h-10 rounded-full bg-primary-container/20 flex items-center justify-center relative overflow-hidden">
-                  <div className={`absolute inset-0 bg-primary/20 rounded-full ${isPlaying ? 'animate-spin' : ''}`} style={{ animationDuration: '3s' }} />
-                  <span className="material-symbols-outlined text-primary text-xl relative z-10 pointer-events-none">music_note</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-label-caps text-label-caps text-primary truncate font-semibold pointer-events-none">Nhạc nền</p>
-                  <p className="font-caption text-[10px] text-on-surface-variant truncate uppercase tracking-tighter pointer-events-none">Kỷ niệm của chúng ta</p>
-                </div>
-              </div>
-              <button onClick={handlePlayClick} className="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center hover:scale-105 transition-transform active:scale-95 flex-shrink-0">
-                <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>{isPlaying ? 'pause' : 'play_arrow'}</span>
-              </button>
-              <div className="h-1 absolute bottom-0 left-0 right-0 bg-primary/10 rounded-full overflow-hidden">
-                <div className="h-full bg-primary transition-all duration-200" style={{ width: `${audioProgress}%` }} />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Modal */}
-      {selectedImage && (
-        <div
-          className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm"
-          onClick={handleCloseModal}
-        >
-          <div className="relative max-w-4xl max-h-[90vh] w-full" onClick={e => e.stopPropagation()}>
-            <img src={selectedImage} alt="" className="w-full h-full object-contain rounded-2xl" />
-            <button onClick={handleCloseModal} className="absolute -top-12 right-0 text-white/70 hover:text-white p-2 transition-colors">
-              <span className="material-symbols-outlined text-3xl">close</span>
+              <span className="material-symbols-outlined text-xs">rocket_launch</span>
+              <span>Bay tới</span>
             </button>
           </div>
         </div>
       )}
 
+      {/* --- CELEBRATION TOAST PILL (SHOWN WHEN REVEALED) --- */}
+      {showCelebrationToast && (
+        <div className="fixed top-20 sm:top-24 left-1/2 -translate-x-1/2 z-40 pointer-events-auto animate-in fade-in zoom-in-95 duration-400 max-w-[92vw] w-max">
+          <div className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-full bg-black/80 border border-yellow-400/60 backdrop-blur-xl shadow-[0_8px_30px_rgba(255,215,0,0.35)] flex items-center gap-2 text-yellow-200 text-xs sm:text-sm font-semibold">
+            <span className="material-symbols-outlined text-base text-pink-400 animate-pulse flex-shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>
+              favorite
+            </span>
+            <span className="truncate">Đã tìm thấy hành tinh mang tên {recipientName}! 🌌</span>
+          </div>
+        </div>
+      )}
+
+      {/* Special Star Love Message Modal */}
+      {showSpecialStarModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="glass-panel max-w-md w-full p-6 sm:p-8 rounded-[32px] bg-gradient-to-b from-[#2a0c38] to-[#16001a] border border-pink-400/40 shadow-[0_0_50px_rgba(236,72,153,0.4)] text-center space-y-5 text-white relative">
+            <button
+              type="button"
+              onClick={() => setShowSpecialStarModal(false)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-sm">close</span>
+            </button>
+
+            <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-tr from-yellow-400 to-pink-500 flex items-center justify-center shadow-[0_0_30px_rgba(255,215,0,0.6)] animate-pulse">
+              <span className="material-symbols-outlined text-3xl text-white" style={{ fontVariationSettings: "'FILL' 1" }}>
+                auto_awesome
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="font-display text-xl sm:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-pink-200 to-fuchsia-300">
+                Hành Tinh Mang Tên {recipientName}
+              </h2>
+              <p className="text-xs text-pink-300/80 uppercase tracking-widest font-semibold">
+                Ngôi sao sáng nhất trong vũ trụ
+              </p>
+            </div>
+
+            <p className="text-sm sm:text-base text-pink-100/90 leading-relaxed font-light italic font-serif">
+              "Giữa vũ trụ bao la với hàng triệu vì sao xa xôi... Dù hành tinh mang tên em ở nơi rất xa, anh vẫn luôn tìm thấy em. Bởi vì em chính là ánh sáng dẫn lối cho cuộc đời anh." ❤️
+            </p>
+
+            <button
+              type="button"
+              onClick={() => setShowSpecialStarModal(false)}
+              className="w-full py-3 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 font-semibold text-xs sm:text-sm shadow-md hover:opacity-90 active:scale-95 transition-all cursor-pointer"
+            >
+              Cảm ơn anh ❤️
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Synchronized Floating Music Player (Fixed at Bottom-Left) */}
+      <FloatingMusicPlayer music={music} isDark={true} />
+
+      {/* Fullscreen Image Lightbox with Left/Right Arrow navigation */}
+      <ImageLightbox
+        images={images}
+        currentIndex={selectedIndex}
+        onClose={handleCloseModal}
+        onNavigate={(newIdx) => setSelectedIndex(newIdx)}
+      />
     </section>
   );
 };

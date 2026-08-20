@@ -52,8 +52,9 @@ export const DashboardLayout: React.FC = () => {
       {/* Sidebar - Desktop */}
       <aside className="hidden md:flex flex-col w-64 fixed inset-y-0 left-0 bg-surface-container-low border-r border-secondary-container/10 p-6 z-30">
         <div className="mb-8">
-          <Link to="/" className="font-display text-h2 text-primary font-bold tracking-tight">
-            Luvia
+          <Link to="/" className="flex items-center gap-2.5 font-display text-h2 text-primary font-bold tracking-tight group">
+            <img src="/duck-logo.png" alt="Luvia Mascot" className="w-8 h-8 rounded-full object-cover shadow-sm border border-pink-200" />
+            <span>Luvia</span>
           </Link>
         </div>
 

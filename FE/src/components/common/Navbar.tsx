@@ -10,8 +10,9 @@ export const Navbar: React.FC = () => {
     <header className="fixed top-0 left-0 right-0 z-50 bg-surface/80 backdrop-blur-xl border-b border-white/20 shadow-[0px_10px_30px_rgba(255,94,156,0.04)]">
       <nav className="flex justify-between items-center w-full px-6 py-4 max-w-7xl mx-auto">
         <div className="flex items-center gap-12">
-          <Link to="/" className="font-display text-h2 text-primary tracking-tight font-bold">
-            Luvia
+          <Link to="/" className="flex items-center gap-2.5 font-display text-h2 text-primary tracking-tight font-bold group">
+            <img src="/duck-logo.png" alt="Luvia Duck Mascot" className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover shadow-sm border border-pink-200/80 group-hover:scale-105 transition-transform" />
+            <span>Luvia</span>
           </Link>
           <div className="hidden md:flex items-center space-x-8">
             <a href="/#features" className="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-all duration-300">

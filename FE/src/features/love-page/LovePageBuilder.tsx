@@ -4,6 +4,37 @@ import api from '../../services/api';
 import { RecipientType, Theme, Occasion, Music } from '../../types';
 import { EmotionalTemplates } from './EmotionalTemplates';
 
+interface AutoResizeTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  minHeight?: number;
+}
+
+const AutoResizeTextarea: React.FC<AutoResizeTextareaProps> = ({ value, onChange, minHeight = 120, className = '', ...props }) => {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const adjustHeight = useCallback(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.max(textareaRef.current.scrollHeight, minHeight)}px`;
+    }
+  }, [minHeight]);
+
+  useEffect(() => {
+    adjustHeight();
+  }, [value, adjustHeight]);
+
+  return (
+    <textarea
+      ref={textareaRef}
+      value={value}
+      onChange={onChange}
+      className={`${className} overflow-hidden resize-none transition-[height] duration-75`}
+      {...props}
+    />
+  );
+};
+
 export const LovePageBuilder: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
   const isEditMode = !!id;
@@ -141,67 +172,71 @@ export const LovePageBuilder: React.FC = () => {
 
   // Load existing data in Edit Mode
   useEffect(() => {
-    if (isEditMode) {
-      const loadPageData = async () => {
-        try {
-          const res = await api.loves.getLoves();
-          if (res.success && res.data) {
-            const page = res.data.find(p => p._id === id);
-            if (page) {
-              setTitle(page.title);
-              setTheme(page.theme);
-              if (page.recipientType) setRecipientType(page.recipientType);
-              if (page.occasion) setOccasion(page.occasion);
+    if (!isEditMode || !id) return;
 
-              if (page.content) {
-                const msgs = page.content.messages || [];
-                if (msgs.length > 0) setHeroMessage(msgs[0]);
-                if (msgs.length > 2) {
-                  const momentList = msgs.slice(1, -1).map(m => {
-                    const sep = m.indexOf('||');
-                    return sep > 0
-                      ? { title: m.slice(0, sep), content: m.slice(sep + 2) }
-                      : { title: '', content: m };
-                  });
-                  setMoments(momentList.length > 0 ? momentList : [{ title: '', content: '' }]);
-                }
-                if (msgs.length > 1) setLoveMessage(msgs[msgs.length - 1]);
-                const imgUrls = page.content.images || [];
-                setExistingImages(imgUrls);
-                if (page.content.mainImage) {
-                  setMainImage(page.content.mainImage);
-                  setUseMainImage(true);
-                } else {
-                  setMainImage('');
-                  setUseMainImage(false);
-                }
+    const loadPageData = async () => {
+      try {
+        const res = await api.loves.getLoves();
+        if (res.success && res.data) {
+          const page = res.data.find(p => p._id === id);
+          if (page) {
+            setTitle(page.title);
+            setTheme(page.theme);
+            if (page.recipientType) setRecipientType(page.recipientType);
+            if (page.occasion) setOccasion(page.occasion);
 
-                const musicUrl = page.content.music || '';
-                if (musicUrl) {
-                  // Check if this music url is in systemMusics
-                  const matchingSystemMusic = systemMusics.find(m => m.file === musicUrl);
-                  if (matchingSystemMusic) {
-                    setMusicSource('system');
-                    setSelectedSystemMusicId(matchingSystemMusic._id);
-                  } else {
-                    setMusicSource('custom');
-                    setExistingMusic(musicUrl);
-                  }
-                }
-                setRecipient(page.content.recipient || '');
+            if (page.content) {
+              const msgs = page.content.messages || [];
+              if (msgs.length > 0) setHeroMessage(msgs[0]);
+              if (msgs.length > 2) {
+                const momentList = msgs.slice(1, -1).map(m => {
+                  const sep = m.indexOf('||');
+                  return sep > 0
+                    ? { title: m.slice(0, sep), content: m.slice(sep + 2) }
+                    : { title: '', content: m };
+                });
+                setMoments(momentList.length > 0 ? momentList : [{ title: '', content: '' }]);
               }
-            } else {
-              setError('Không tìm thấy trang kỷ niệm cần sửa.');
+              if (msgs.length > 1) setLoveMessage(msgs[msgs.length - 1]);
+              const imgUrls = page.content.images || [];
+              setExistingImages(imgUrls);
+              if (page.content.mainImage) {
+                setMainImage(page.content.mainImage);
+                setUseMainImage(true);
+              } else {
+                setMainImage('');
+                setUseMainImage(false);
+              }
+
+              const musicUrl = page.content.music || '';
+              if (musicUrl) {
+                // Check if this music url is in systemMusics
+                const matchingSystemMusic = systemMusics.find(m =>
+                  m.file === musicUrl ||
+                  (m.file && musicUrl && (m.file.endsWith(musicUrl) || musicUrl.endsWith(m.file)))
+                );
+                if (matchingSystemMusic) {
+                  setMusicSource('system');
+                  setSelectedSystemMusicId(matchingSystemMusic._id);
+                } else {
+                  setMusicSource('custom');
+                  setExistingMusic(musicUrl);
+                }
+              } else {
+                setMusicSource('system');
+                setSelectedSystemMusicId('');
+              }
+              setRecipient(page.content.recipient || '');
             }
+          } else {
+            setError('Không tìm thấy trang kỷ niệm cần sửa.');
           }
-        } catch (e) {
-          setError('Lỗi khi tải thông tin trang kỷ niệm.');
         }
-      };
-      if (systemMusics.length > 0) {
-        loadPageData();
+      } catch (e) {
+        setError('Lỗi khi tải thông tin trang kỷ niệm.');
       }
-    }
+    };
+    loadPageData();
   }, [id, isEditMode, systemMusics]);
 
   // Handle Recipient Type Selection (and prefill templates)
@@ -393,12 +428,22 @@ export const LovePageBuilder: React.FC = () => {
         formData.append('pin', pin);
       }
 
-      // Determine final music path if system music selected
+      // Determine final music path
       let finalMusicUrl = "";
       if (musicSource === 'system') {
         const track = systemMusics.find(m => m._id === selectedSystemMusicId);
         if (track) {
           finalMusicUrl = track.file;
+        } else {
+          finalMusicUrl = "";
+        }
+      } else {
+        if (selectedMusic) {
+          finalMusicUrl = ""; // Will be populated by newly uploaded file on backend
+        } else if (existingMusic) {
+          finalMusicUrl = existingMusic;
+        } else {
+          finalMusicUrl = "";
         }
       }
 
@@ -411,9 +456,9 @@ export const LovePageBuilder: React.FC = () => {
         messages: messages,
         recipient: recipient,
         occasion: occasionsList.find(o => o.slug === occasion)?.name || occasion, // compatible occasion name
-        music: musicSource === 'system' ? finalMusicUrl : undefined,
+        music: finalMusicUrl,
         existingImages: existingImages,
-        existingMusic: musicSource === 'system' ? "" : existingMusic,
+        existingMusic: musicSource === 'custom' ? existingMusic : "",
         mainImage: submitMainImage
       };
 
@@ -586,49 +631,54 @@ export const LovePageBuilder: React.FC = () => {
 
         {/* Step 2: Messages */}
         {currentStep === 2 && (
-          <section className="space-y-6 animate-in fade-in duration-300">
+          <section className="space-y-8 animate-in fade-in duration-300">
             <div>
-              <h2 className="font-display text-h2 text-on-surface mb-2 font-bold">Viết lời nhắn gửi</h2>
-              <p className="text-on-surface-variant font-body-md">Những câu chúc ấm áp sẽ dẫn dắt câu chuyện kỉ niệm đầy cảm xúc.</p>
+              <h2 className="font-display text-2xl sm:text-3xl text-on-surface mb-2 font-bold">Viết lời nhắn gửi</h2>
+              <p className="text-on-surface-variant font-body-md text-sm sm:text-base">Những câu chúc ấm áp sẽ dẫn dắt câu chuyện kỉ niệm đầy cảm xúc.</p>
             </div>
 
-            <div className="space-y-5 max-h-[420px] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="space-y-6">
               {/* Section 1: Intro Message */}
-              <div className="p-5 border border-secondary-fixed rounded-2xl bg-white/30">
-                <span className="font-label-caps text-[10px] text-primary uppercase font-bold block mb-2">1. Lời chúc mở đầu</span>
-                <textarea
+              <div className="p-6 border border-secondary-fixed/80 rounded-2xl bg-white/40 shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-label-caps text-xs text-primary uppercase font-bold tracking-wider">1. Lời chúc mở đầu</span>
+                  <span className="text-xs text-on-surface-variant/70 italic hidden sm:inline">Hiển thị trang trọng tại đầu trang</span>
+                </div>
+                <AutoResizeTextarea
                   value={heroMessage}
                   onChange={e => setHeroMessage(e.target.value)}
-                  className="w-full h-24 p-3 bg-white/70 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-on-surface-variant font-body-md"
+                  minHeight={130}
+                  className="w-full p-4 bg-white/85 border border-gray-200/80 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-on-surface font-body-md text-sm sm:text-base leading-relaxed"
                   placeholder="Mẹ yêu, ngày hôm nay con muốn nói một điều..."
                 />
               </div>
 
               {/* Section 2-3: Moments */}
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <div className="flex items-center justify-between">
-                  <span className="font-label-caps text-[10px] text-secondary uppercase font-bold block">2. Những chương câu chuyện kỷ niệm</span>
+                  <span className="font-label-caps text-xs text-secondary uppercase font-bold tracking-wider">2. Những chương câu chuyện kỷ niệm</span>
                   <button
                     type="button"
                     onClick={handleAddMoment}
-                    className="bg-primary/10 hover:bg-primary/20 text-primary px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all flex items-center gap-1"
+                    className="bg-primary/10 hover:bg-primary/20 text-primary px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-xs">add</span>
-                    Thêm khoảnh khắc
+                    <span className="material-symbols-outlined text-sm">add</span>
+                    <span>Thêm khoảnh khắc</span>
                   </button>
                 </div>
 
                 {moments.map((moment, index) => (
-                  <div key={index} className="p-5 border border-secondary-fixed rounded-2xl bg-white/30 space-y-3">
+                  <div key={index} className="p-6 border border-secondary-fixed/80 rounded-2xl bg-white/40 shadow-sm space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="font-label-caps text-[10px] text-secondary uppercase font-bold">Khoảnh khắc {index + 1}</span>
+                      <span className="font-label-caps text-xs text-secondary uppercase font-bold">Khoảnh khắc {index + 1}</span>
                       {moments.length > 1 && (
                         <button
                           type="button"
                           onClick={() => handleRemoveMoment(index)}
-                          className="text-error hover:bg-error-container/20 p-1.5 rounded-lg transition-all"
+                          className="text-error hover:bg-error-container/20 p-1.5 rounded-lg transition-all cursor-pointer"
+                          title="Xóa khoảnh khắc này"
                         >
-                          <span className="material-symbols-outlined text-sm">delete</span>
+                          <span className="material-symbols-outlined text-base">delete</span>
                         </button>
                       )}
                     </div>
@@ -636,13 +686,14 @@ export const LovePageBuilder: React.FC = () => {
                       <input
                         value={moment.title}
                         onChange={e => handleMomentChange(index, 'title', e.target.value)}
-                        className="w-full px-4 py-3 bg-white/70 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-on-surface font-body-md font-medium"
+                        className="w-full px-4 py-3 bg-white/85 border border-gray-200/80 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-on-surface font-body-md text-sm sm:text-base font-semibold transition-all"
                         placeholder="Tiêu đề khoảnh khắc (VD: Bữa cơm ấm áp, Ngày đầu tiên...)"
                       />
-                      <textarea
+                      <AutoResizeTextarea
                         value={moment.content}
                         onChange={e => handleMomentChange(index, 'content', e.target.value)}
-                        className="w-full h-20 p-3 bg-white/70 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-on-surface-variant font-body-md"
+                        minHeight={110}
+                        className="w-full p-4 bg-white/85 border border-gray-200/80 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-on-surface-variant font-body-md text-sm sm:text-base leading-relaxed"
                         placeholder="Nội dung khoảnh khắc thân thương..."
                       />
                     </div>
@@ -651,12 +702,16 @@ export const LovePageBuilder: React.FC = () => {
               </div>
 
               {/* Section 4: Ending Message */}
-              <div className="p-5 border border-secondary-fixed rounded-2xl bg-white/30">
-                <span className="font-label-caps text-[10px] text-error uppercase font-bold block mb-2">3. Lời kết yêu thương</span>
-                <textarea
+              <div className="p-6 border border-secondary-fixed/80 rounded-2xl bg-white/40 shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-label-caps text-xs text-error uppercase font-bold tracking-wider">3. Lời kết yêu thương</span>
+                  <span className="text-xs text-on-surface-variant/70 italic hidden sm:inline">Xuất hiện trong bức thư cuối cùng</span>
+                </div>
+                <AutoResizeTextarea
                   value={loveMessage}
                   onChange={e => setLoveMessage(e.target.value)}
-                  className="w-full h-24 p-3 bg-white/70 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-on-surface-variant font-body-md font-handwriting text-lg"
+                  minHeight={130}
+                  className="w-full p-4 bg-white/85 border border-gray-200/80 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-on-surface-variant font-handwriting text-lg sm:text-xl leading-relaxed"
                   placeholder="Con chúc mẹ luôn an vui. Con yêu mẹ nhiều!"
                 />
               </div>

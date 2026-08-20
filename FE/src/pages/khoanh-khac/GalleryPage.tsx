@@ -109,7 +109,7 @@ export const GalleryPage: React.FC = () => {
         <CosmicGallery
           images={galleryImages}
           title={lovePage.content.recipient || lovePage.title}
-          music={lovePage.content.music}
+          music={lovePage.content.music || themeConfig?.defaultMusic || ''}
           onNext={handleNext}
           onBack={() => navigate(`/page/${slug}`)}
         />
@@ -117,7 +117,7 @@ export const GalleryPage: React.FC = () => {
         <PolaroidGallery
           images={galleryImages}
           title={lovePage.content.recipient || lovePage.title}
-          music={lovePage.content.music}
+          music={lovePage.content.music || themeConfig?.defaultMusic || ''}
           onNext={handleNext}
           onBack={() => navigate(`/page/${slug}`)}
         />

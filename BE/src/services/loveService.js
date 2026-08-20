@@ -1,4 +1,6 @@
 import Love from "../models/love.js";
+import Music from "../models/music.js";
+import Theme from "../models/theme.js";
 import bcrypt from "bcrypt";
 import mongoose from "mongoose";
 import fs from "fs";
@@ -195,19 +197,23 @@ const updateLoveService = async (
         }
 
         // Compare and delete removed music from disk safely
-        if (content.music !== undefined) {
+        if (content.music !== undefined || musicUrl) {
             const oldMusic = page.content.music;
             let finalMusic = "";
             if (musicUrl) {
                 finalMusic = musicUrl; // dùng nhạc mới upload
-            } else if (content.music === oldMusic) {
-                finalMusic = oldMusic; // giữ nhạc cũ
+            } else if (content.music) {
+                finalMusic = content.music; // giữ nhạc cũ hoặc dùng nhạc hệ thống vừa chọn
             } else {
                 finalMusic = ""; // xóa nhạc
             }
 
             if (oldMusic && oldMusic !== finalMusic) {
-                deleteFileByUrl(oldMusic);
+                const isSystemTrack = await Music.exists({ file: oldMusic });
+                const isThemeTrack = await Theme.exists({ defaultMusic: oldMusic });
+                if (!isSystemTrack && !isThemeTrack) {
+                    deleteFileByUrl(oldMusic);
+                }
             }
             page.content.music = finalMusic;
         }
@@ -293,9 +299,13 @@ const deleteLoveService = async (
     if (page.content && page.content.images) {
         page.content.images.forEach(img => deleteFileByUrl(img));
     }
-    // Xóa nhạc của page trên disk
+    // Xóa nhạc của page trên disk (chỉ xóa nếu là nhạc riêng của người dùng tải lên, không xóa nhạc hệ thống)
     if (page.content && page.content.music) {
-        deleteFileByUrl(page.content.music);
+        const isSystemTrack = await Music.exists({ file: page.content.music });
+        const isThemeTrack = await Theme.exists({ defaultMusic: page.content.music });
+        if (!isSystemTrack && !isThemeTrack) {
+            deleteFileByUrl(page.content.music);
+        }
     }
 
     // Xóa page

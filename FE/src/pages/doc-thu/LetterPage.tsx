@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { LovePage, Theme } from '../../types';
-import { useMusic } from '../../store/music.store';
 import { ParticleBackground } from '../../components/ui/ParticleBackground';
+import { FloatingMusicPlayer } from '../../components/common/FloatingMusicPlayer';
 import './LetterPage.scss';
 
 export const LetterPage: React.FC = () => {
@@ -20,67 +20,6 @@ export const LetterPage: React.FC = () => {
   const [envelopeOpen, setEnvelopeOpen] = useState(false);
   const [letterExpanded, setLetterExpanded] = useState(false);
   const [endingActive, setEndingActive] = useState(false);
-
-  // Floating Music Player state
-  const { isPlaying, progress: audioProgress, togglePlay, playMusic, pauseMusic, currentMusic } = useMusic();
-
-  // Music Floater States & Handlers (same as CosmicGallery)
-  const [musicExpanded, setMusicExpanded] = useState(false);
-  const [musicPos, setMusicPos] = useState({ x: 24, y: 24 });
-  const musicDragRef = useRef({ dragging: false, moved: false, startX: 0, startY: 0, startPosX: 0, startPosY: 0 });
-
-  const handleMusicMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    const d = musicDragRef.current;
-    d.dragging = true;
-    d.moved = false;
-    d.startX = e.clientX;
-    d.startY = e.clientY;
-    d.startPosX = musicPos.x;
-    d.startPosY = musicPos.y;
-
-    const handleMove = (ev: MouseEvent) => {
-      if (!d.dragging) return;
-      const dx = ev.clientX - d.startX;
-      const dy = ev.clientY - d.startY;
-      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) d.moved = true;
-      setMusicPos({ x: d.startPosX + dx, y: d.startPosY + dy });
-    };
-    const handleUp = () => { d.dragging = false; window.removeEventListener('mousemove', handleMove); window.removeEventListener('mouseup', handleUp); };
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
-  }, [musicPos.x, musicPos.y]);
-
-  const handleMusicTouchStart = useCallback((e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    const d = musicDragRef.current;
-    d.dragging = true;
-    d.moved = false;
-    d.startX = touch.clientX;
-    d.startY = touch.clientY;
-    d.startPosX = musicPos.x;
-    d.startPosY = musicPos.y;
-
-    const handleMove = (ev: TouchEvent) => {
-      const t = ev.touches[0];
-      const dx = t.clientX - d.startX;
-      const dy = t.clientY - d.startY;
-      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) d.moved = true;
-      setMusicPos({ x: d.startPosX + dx, y: d.startPosY + dy });
-    };
-    const handleEnd = () => { d.dragging = false; window.removeEventListener('touchmove', handleMove); window.removeEventListener('touchend', handleEnd); };
-    window.addEventListener('touchmove', handleMove);
-    window.addEventListener('touchend', handleEnd);
-  }, [musicPos.x, musicPos.y]);
-
-  const handleNoteClick = useCallback(() => {
-    if (!musicDragRef.current.moved) setMusicExpanded(p => !p);
-  }, []);
-
-  const handlePlayClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    togglePlay();
-  }, [togglePlay]);
 
   // Load love page data
   useEffect(() => {
@@ -126,7 +65,7 @@ export const LetterPage: React.FC = () => {
   const lovePageData = lovePage;
   const content = lovePageData?.content;
   const messages = content?.messages || [];
-  const music = content?.music || '';
+  const music = content?.music || themeConfig?.defaultMusic || '';
   const lastMessage = messages[messages.length - 1] || "Mãi yêu em!";
 
   // Fetch theme configuration when lovePage changes
@@ -217,26 +156,6 @@ export const LetterPage: React.FC = () => {
     const storyChapters = messages.slice(1, -1);
     return images.slice(storyChapters.length);
   }, [lovePageData]);
-
-  // Audio setup
-  useEffect(() => {
-    if (loading) return;
-
-    if (music) {
-      if (music !== currentMusic) {
-        playMusic(music);
-      }
-    } else {
-      pauseMusic();
-    }
-
-    return () => {
-      // Pause music if we are leaving the love page views
-      if (!window.location.pathname.startsWith('/page/')) {
-        pauseMusic();
-      }
-    };
-  }, [loading, music, currentMusic, playMusic, pauseMusic]);
 
   // Open envelope
   const handleEnvelopeClick = () => {
@@ -637,9 +556,9 @@ export const LetterPage: React.FC = () => {
               navigate(`/page/${slug}`);
             }
           }}
-          className="fixed top-6 left-6 z-50 flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white/80 hover:text-white hover:bg-white/20 transition-all font-label-caps text-label-caps shadow-md"
+          className="fixed top-4 left-4 sm:top-6 sm:left-6 z-50 flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white/90 hover:text-white hover:bg-white/20 transition-all font-label-caps text-[11px] sm:text-xs shadow-md active:scale-95"
         >
-          <span className="material-symbols-outlined text-lg">arrow_back</span>
+          <span className="material-symbols-outlined text-base sm:text-lg">arrow_back</span>
           <span>Quay lại</span>
         </button>
       )}
@@ -664,32 +583,46 @@ export const LetterPage: React.FC = () => {
 
       {/* Fullscreen Expanded Letter Overlay */}
       <div className={`letter-expanded-overlay ${letterExpanded ? 'active' : ''}`}>
-        <div className="letter-expanded-card relative z-10 text-white">
-          {/* Scrollable Letter Content */}
-          <div className="letter-scroll-content flex-1 overflow-y-auto pr-2 mb-6">
-            <span className="material-symbols-outlined text-primary text-4xl mb-4 block" style={{ fontVariationSettings: "'FILL' 1" }}>format_quote</span>
-            <div className="font-handwriting text-2xl md:text-3xl leading-relaxed mb-6">
+        <div className="letter-expanded-card relative z-10">
+          {/* Decorative Letter Header */}
+          <div className="flex items-center justify-between border-b border-rose-200/70 pb-3 mb-4">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#c4286d] text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>
+                favorite
+              </span>
+              <span className="text-xs sm:text-sm font-semibold tracking-wide text-[#8a224d]">
+                Thư gửi {lovePage?.title || 'người thương'}
+              </span>
+            </div>
+            <span className="text-[11px] sm:text-xs text-stone-500 italic">
+              {new Date().toLocaleDateString('vi-VN')}
+            </span>
+          </div>
+
+          {/* Scrollable Letter Content with High-readability gentle typography */}
+          <div className="letter-scroll-content flex-1 overflow-y-auto pr-2 mb-4 select-text">
+            <div className="letter-body-text text-base sm:text-lg leading-loose whitespace-pre-line break-words mb-6 text-left">
               {lastMessage}
             </div>
 
-            <div className="text-right mb-2">
-              <p className="font-label-caps text-label-caps text-primary tracking-widest uppercase font-semibold">
+            <div className="text-right border-t border-rose-100 pt-3.5 mb-1">
+              <p className="text-xs sm:text-sm text-[#9c2457] font-semibold tracking-wider">
                 {getSignOffText(lovePage?.recipientType)}
               </p>
             </div>
           </div>
 
-          {/* Letter Buttons: Kết thúc & Ngắm vườn hoa */}
-          <div className="flex gap-3 md:gap-4 border-t border-white/10 pt-6">
+          {/* Letter Buttons: Kết thúc & Ngắm cảnh */}
+          <div className="flex gap-3 sm:gap-4 border-t border-rose-200/70 pt-4">
             <button
               onClick={handleAdmireGarden}
-              className="flex-1 py-2.5 md:py-3 px-3 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm md:text-base font-semibold transition-all text-center whitespace-nowrap flex items-center justify-center"
+              className="flex-1 py-2.5 sm:py-3 px-3 rounded-full bg-[#fff0f4] hover:bg-[#ffe5ec] border border-rose-200/80 text-[#9c2457] text-xs sm:text-sm font-semibold transition-all text-center whitespace-nowrap flex items-center justify-center cursor-pointer active:scale-95 shadow-sm"
             >
               Ngắm cảnh ✨
             </button>
             <button
               onClick={handleFinish}
-              className="flex-1 py-2.5 md:py-3 px-3 rounded-full bg-primary hover:bg-primary/95 text-white text-sm md:text-base font-semibold transition-all shadow-[0_0_15px_rgba(178,30,97,0.4)] text-center whitespace-nowrap flex items-center justify-center"
+              className="flex-1 py-2.5 sm:py-3 px-3 rounded-full bg-gradient-to-r from-[#c4286d] to-[#9c1852] hover:opacity-95 text-white text-xs sm:text-sm font-semibold transition-all shadow-[0_4px_16px_rgba(196,40,109,0.35)] text-center whitespace-nowrap flex items-center justify-center cursor-pointer active:scale-95"
             >
               Kết thúc ❤️
             </button>
@@ -779,50 +712,8 @@ export const LetterPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Floating Music Player */}
-      {music && (
-        <div className="fixed z-50 animate-fade-in" style={{ left: musicPos.x, bottom: musicPos.y }}>
-          {/* Collapsed: note icon only */}
-          {!musicExpanded && (
-            <div
-              onClick={handleNoteClick}
-              onMouseDown={handleMusicMouseDown}
-              onTouchStart={handleMusicTouchStart}
-              className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center hover:bg-white/20 transition-all cursor-grab active:cursor-grabbing relative overflow-hidden shadow-lg"
-            >
-              <div className={`absolute inset-0 bg-primary/20 rounded-full ${isPlaying ? 'animate-spin' : ''}`} style={{ animationDuration: '3s' }} />
-              <span className="material-symbols-outlined text-white text-xl relative z-10 pointer-events-none">music_note</span>
-            </div>
-          )}
-
-          {/* Expanded: full player */}
-          {musicExpanded && (
-            <div className="bg-[#16213e]/90 backdrop-blur-md dreamy-shadow rounded-full px-6 py-3 flex items-center justify-between gap-4 border border-white/10 relative overflow-hidden shadow-lg max-w-xs text-white">
-              <div
-                onClick={handleNoteClick}
-                onMouseDown={handleMusicMouseDown}
-                onTouchStart={handleMusicTouchStart}
-                className="flex items-center gap-4 flex-1 min-w-0 cursor-grab active:cursor-grabbing"
-              >
-                <div className="w-10 h-10 rounded-full bg-primary-container/20 flex items-center justify-center relative overflow-hidden">
-                  <div className={`absolute inset-0 bg-primary/20 rounded-full ${isPlaying ? 'animate-spin' : ''}`} style={{ animationDuration: '3s' }} />
-                  <span className="material-symbols-outlined text-primary text-xl relative z-10 pointer-events-none">music_note</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-label-caps text-label-caps text-primary truncate font-semibold pointer-events-none">Nhạc nền</p>
-                  <p className="font-caption text-[10px] text-white/60 truncate uppercase tracking-tighter pointer-events-none">Kỷ niệm của chúng ta</p>
-                </div>
-              </div>
-              <button onClick={handlePlayClick} className="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center hover:scale-105 transition-transform active:scale-95 flex-shrink-0">
-                <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>{isPlaying ? 'pause' : 'play_arrow'}</span>
-              </button>
-              <div className="h-1 absolute bottom-0 left-0 right-0 bg-primary/10 rounded-full overflow-hidden">
-                <div className="h-full bg-primary transition-all duration-200" style={{ width: `${audioProgress}%` }} />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Synchronized Floating Music Player */}
+      <FloatingMusicPlayer music={music} isDark={isLoverStyle} />
     </div>
   );
 };

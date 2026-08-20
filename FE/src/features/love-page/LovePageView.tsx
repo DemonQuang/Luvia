@@ -4,8 +4,8 @@ import { LovePage, Theme } from '../../types';
 import api from '../../services/api';
 import { ShaderBackground } from '../../components/ui/ShaderBackground';
 import { ParticleBackground } from '../../components/ui/ParticleBackground';
-import { useMusic } from '../../store/music.store';
 import { SunflowerDuck } from '../../components/ui/SunflowerDuck';
+import { FloatingMusicPlayer } from '../../components/common/FloatingMusicPlayer';
 
 const hexToRgb = (hex: string): string => {
   hex = hex.replace(/^#/, '');
@@ -50,7 +50,6 @@ const RevealSection: React.FC<{ children: React.ReactNode; className?: string }>
 
 export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
   const navigate = useNavigate();
-  const { isPlaying, progress: audioProgress, togglePlay, playMusic, pauseMusic, currentMusic } = useMusic();
   const [showToast, setShowToast] = useState(false);
   const heroBgRef = useRef<HTMLDivElement>(null);
   const [themeConfig, setThemeConfig] = useState<Theme | null>(null);
@@ -60,74 +59,6 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
   const pagePrimary = page.content.primaryColor || null;
   const pageSecondary = page.content.secondaryColor || null;
   const [activeLayout, setActiveLayout] = useState<string>(page.content.layout || 'classic');
-
-  // Music Floater States & Handlers (same as CosmicGallery)
-  const [musicExpanded, setMusicExpanded] = useState(false);
-  const [musicPos, setMusicPos] = useState(() => {
-    const isMobile = window.innerWidth <= 768;
-    return {
-      x: isMobile ? window.innerWidth - 72 : window.innerWidth - 120,
-      y: 80
-    };
-  });
-  const musicDragRef = useRef({ dragging: false, moved: false, startX: 0, startY: 0, startPosX: 0, startPosY: 0 });
-
-  const handleMusicMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    const d = musicDragRef.current;
-    d.dragging = true;
-    d.moved = false;
-    d.startX = e.clientX;
-    d.startY = e.clientY;
-    d.startPosX = musicPos.x;
-    d.startPosY = musicPos.y;
-
-    const handleMove = (ev: MouseEvent) => {
-      if (!d.dragging) return;
-      const dx = ev.clientX - d.startX;
-      const dy = ev.clientY - d.startY;
-      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) d.moved = true;
-      const nextX = Math.max(10, Math.min(window.innerWidth - 64, d.startPosX + dx));
-      const nextY = Math.max(10, Math.min(window.innerHeight - 64, d.startPosY + dy));
-      setMusicPos({ x: nextX, y: nextY });
-    };
-    const handleUp = () => { d.dragging = false; window.removeEventListener('mousemove', handleMove); window.removeEventListener('mouseup', handleUp); };
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
-  }, [musicPos.x, musicPos.y]);
-
-  const handleMusicTouchStart = useCallback((e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    const d = musicDragRef.current;
-    d.dragging = true;
-    d.moved = false;
-    d.startX = touch.clientX;
-    d.startY = touch.clientY;
-    d.startPosX = musicPos.x;
-    d.startPosY = musicPos.y;
-
-    const handleMove = (ev: TouchEvent) => {
-      const t = ev.touches[0];
-      const dx = t.clientX - d.startX;
-      const dy = t.clientY - d.startY;
-      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) d.moved = true;
-      const nextX = Math.max(10, Math.min(window.innerWidth - 64, d.startPosX + dx));
-      const nextY = Math.max(10, Math.min(window.innerHeight - 64, d.startPosY + dy));
-      setMusicPos({ x: nextX, y: nextY });
-    };
-    const handleEnd = () => { d.dragging = false; window.removeEventListener('touchmove', handleMove); window.removeEventListener('touchend', handleEnd); };
-    window.addEventListener('touchmove', handleMove);
-    window.addEventListener('touchend', handleEnd);
-  }, [musicPos.x, musicPos.y]);
-
-  const handleNoteClick = useCallback(() => {
-    if (!musicDragRef.current.moved) setMusicExpanded(p => !p);
-  }, []);
-
-  const handlePlayClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    togglePlay();
-  }, [togglePlay]);
 
   useEffect(() => {
     api.loves.incrementView(page.slug).catch(() => { });
@@ -167,7 +98,7 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
   const { title, content } = page;
   const messages = content.messages || [];
   const images = content.images || [];
-  const music = content.music || '';
+  const music = content.music || themeConfig?.defaultMusic || '';
   
   // check if mainImage is present (Hero Image option)
   const mainCoverImage = content.mainImage || '';
@@ -215,24 +146,6 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
   const galleryImages = useMemo(() => {
     return chapterImages.slice(storyChapters.length);
   }, [chapterImages, storyChapters.length]);
-
-  // Audio setup
-  useEffect(() => {
-    if (music) {
-      if (music !== currentMusic) {
-        playMusic(music);
-      }
-    } else {
-      pauseMusic();
-    }
-
-    return () => {
-      // Pause music if we are leaving the love page views
-      if (!window.location.pathname.startsWith('/page/')) {
-        pauseMusic();
-      }
-    };
-  }, [music, currentMusic, playMusic, pauseMusic]);
 
   // Parallax
   useEffect(() => {
@@ -361,9 +274,9 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
             )}
             <div className={`absolute inset-0 bg-gradient-to-b from-transparent ${isDark ? 'via-[#1a1a2e]/20 to-[#1a1a2e]' : 'via-background/20 to-background'}`} />
           </div>
-          <RevealSection className="relative z-10 text-center max-w-4xl">
+          <RevealSection className="relative z-10 text-center max-w-4xl mx-auto px-4">
             {!mainCoverImage && (
-              <div className="flex justify-center mb-12 relative select-none">
+              <div className="flex justify-center mb-10 relative select-none">
                 {/* Glowing background halo */}
                 <div className="absolute inset-0 w-48 h-48 bg-primary/20 rounded-full filter blur-2xl animate-pulse mx-auto" />
                 
@@ -390,12 +303,32 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
                 </div>
               </div>
             )}
-            <p className="font-label-caps text-label-caps text-primary mb-4 tracking-[0.2em] uppercase font-semibold">{title}</p>
-            <h1 className="font-display text-h1-mobile md:text-h1 leading-tight mb-8 px-4 italic font-bold" style={{ color: isDark ? '#f8f9ff' : undefined }}>
-              "{heroMessage}"
-            </h1>
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 backdrop-blur-md border border-primary/20 mb-6 shadow-sm">
+              <span className="material-symbols-outlined text-sm text-primary">auto_awesome</span>
+              <span className="font-label-caps text-xs text-primary tracking-[0.2em] uppercase font-bold">{title}</span>
+            </div>
+
+            {/* Hero Message with adaptive sizing, preserved line breaks and elegant typography */}
+            <div className="relative max-w-3xl mx-auto mb-10 px-4 md:px-6">
+              <h1
+                className={`font-display italic font-semibold leading-relaxed md:leading-relaxed whitespace-pre-line break-words text-center ${
+                  heroMessage.length > 150
+                    ? 'text-lg sm:text-xl md:text-2xl lg:text-3xl'
+                    : heroMessage.length > 80
+                    ? 'text-xl sm:text-2xl md:text-3xl lg:text-4xl'
+                    : 'text-2xl sm:text-3xl md:text-4xl lg:text-5xl'
+                }`}
+                style={{
+                  color: isDark ? '#f8f9ff' : undefined,
+                  textShadow: mainCoverImage ? '0 2px 20px rgba(0,0,0,0.5)' : undefined
+                }}
+              >
+                "{heroMessage}"
+              </h1>
+            </div>
+
             <div className="flex justify-center">
-              <div className="w-12 h-12 rounded-full border border-primary/30 flex items-center justify-center animate-bounce">
+              <div className="w-12 h-12 rounded-full border border-primary/30 flex items-center justify-center animate-bounce bg-white/10 backdrop-blur-sm">
                 <span className="material-symbols-outlined text-primary">expand_more</span>
               </div>
             </div>
@@ -414,14 +347,29 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
                 <RevealSection key={idx}>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 items-center">
                     <div className={`${isEven ? 'order-2 md:order-1' : 'order-2 md:pl-8'}`}>
-                      <h2 className="font-h2 text-h2 text-primary mb-3 md:mb-4">{ch.title || `Chương ${idx + 1}`}</h2>
-                      <p className="font-body-lg text-body-lg text-on-surface-variant italic mb-5 md:mb-8 leading-relaxed">{ch.content}</p>
-                      <div className="h-px w-24 bg-primary/20" />
+                      <div className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider mb-3 border border-primary/15">
+                        Chương {idx + 1}
+                      </div>
+                      <h2 className="font-h2 text-2xl md:text-3xl text-primary font-bold mb-4 tracking-tight">
+                        {ch.title || `Khoảnh khắc ${idx + 1}`}
+                      </h2>
+                      <div
+                        className={`font-body-lg text-base md:text-lg leading-relaxed md:leading-loose whitespace-pre-line break-words mb-6 ${
+                          isDark ? 'text-slate-200' : 'text-slate-700'
+                        }`}
+                      >
+                        {ch.content}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="h-0.5 w-16 bg-primary/40 rounded-full" />
+                        <span className="material-symbols-outlined text-primary text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
+                        <div className="h-0.5 w-8 bg-primary/20 rounded-full" />
+                      </div>
                     </div>
                     <div className={`${isEven ? 'order-1 md:order-2' : 'order-1'}`}>
-                      <div className="rounded-3xl overflow-hidden dreamy-shadow transform hover:rotate-0 transition-transform duration-500 border border-white/10">
+                      <div className="rounded-3xl overflow-hidden dreamy-shadow transform hover:scale-[1.02] transition-all duration-500 border border-white/10 shadow-lg">
                         {imgUrl ? (
-                          <img className="w-full aspect-[4/5] object-cover" src={imgUrl} alt={ch.title || `Chương ${idx + 1}`} />
+                          <img className="w-full aspect-[4/5] object-cover" src={imgUrl} alt={ch.title || `Chương ${idx + 1}`} loading="lazy" />
                         ) : (
                           <div className="w-full aspect-[4/5] bg-surface-container flex items-center justify-center">
                             <span className="material-symbols-outlined text-5xl text-primary-container">favorite</span>
@@ -454,15 +402,26 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
                       {/* Left Card */}
                       <div className={`col-span-4 ${isEven ? 'text-right' : 'opacity-0 pointer-events-none'}`}>
                         {isEven && (
-                          <div className="glass-panel p-6 rounded-3xl dreamy-shadow border border-white/20 hover:scale-[1.02] transition-all duration-300 inline-block text-left w-full">
+                          <div className="glass-panel p-6 md:p-8 rounded-3xl dreamy-shadow border border-white/20 hover:scale-[1.02] transition-all duration-300 inline-block text-left w-full shadow-lg">
                             {imgUrl && (
-                              <div className="rounded-2xl overflow-hidden mb-4 border border-white/10 shadow-sm">
-                                <img className="w-full h-64 object-cover" src={imgUrl} alt={ch.title} />
+                              <div className="rounded-2xl overflow-hidden mb-5 border border-white/10 shadow-sm">
+                                <img className="w-full h-64 object-cover" src={imgUrl} alt={ch.title} loading="lazy" />
                               </div>
                             )}
-                            <h3 className="font-h2 text-h3 text-primary mb-2 font-bold">{ch.title || `Khoảnh khắc ${idx + 1}`}</h3>
-                            <p className="font-body-lg text-body-lg text-on-surface-variant italic leading-relaxed">{ch.content}</p>
-                            <div className="h-px w-16 bg-primary/20 mt-4" />
+                            <div className="inline-block px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-bold uppercase tracking-wider mb-2 border border-primary/15">
+                              Khoảnh khắc {idx + 1}
+                            </div>
+                            <h3 className="font-h2 text-xl md:text-2xl text-primary mb-3 font-bold tracking-tight">
+                              {ch.title || `Khoảnh khắc ${idx + 1}`}
+                            </h3>
+                            <div
+                              className={`font-body-md text-sm md:text-base leading-relaxed md:leading-loose whitespace-pre-line break-words ${
+                                isDark ? 'text-slate-200' : 'text-slate-700'
+                              }`}
+                            >
+                              {ch.content}
+                            </div>
+                            <div className="h-0.5 w-16 bg-primary/30 mt-5 rounded-full" />
                           </div>
                         )}
                       </div>
@@ -477,15 +436,26 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
                       {/* Right Card */}
                       <div className={`col-span-4 ${!isEven ? 'text-left' : 'opacity-0 pointer-events-none'}`}>
                         {!isEven && (
-                          <div className="glass-panel p-6 rounded-3xl dreamy-shadow border border-white/20 hover:scale-[1.02] transition-all duration-300 inline-block text-left w-full">
+                          <div className="glass-panel p-6 md:p-8 rounded-3xl dreamy-shadow border border-white/20 hover:scale-[1.02] transition-all duration-300 inline-block text-left w-full shadow-lg">
                             {imgUrl && (
-                              <div className="rounded-2xl overflow-hidden mb-4 border border-white/10 shadow-sm">
-                                <img className="w-full h-64 object-cover" src={imgUrl} alt={ch.title} />
+                              <div className="rounded-2xl overflow-hidden mb-5 border border-white/10 shadow-sm">
+                                <img className="w-full h-64 object-cover" src={imgUrl} alt={ch.title} loading="lazy" />
                               </div>
                             )}
-                            <h3 className="font-h2 text-h3 text-primary mb-2 font-bold">{ch.title || `Khoảnh khắc ${idx + 1}`}</h3>
-                            <p className="font-body-lg text-body-lg text-on-surface-variant italic leading-relaxed">{ch.content}</p>
-                            <div className="h-px w-16 bg-primary/20 mt-4" />
+                            <div className="inline-block px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-bold uppercase tracking-wider mb-2 border border-primary/15">
+                              Khoảnh khắc {idx + 1}
+                            </div>
+                            <h3 className="font-h2 text-xl md:text-2xl text-primary mb-3 font-bold tracking-tight">
+                              {ch.title || `Khoảnh khắc ${idx + 1}`}
+                            </h3>
+                            <div
+                              className={`font-body-md text-sm md:text-base leading-relaxed md:leading-loose whitespace-pre-line break-words ${
+                                isDark ? 'text-slate-200' : 'text-slate-700'
+                              }`}
+                            >
+                              {ch.content}
+                            </div>
+                            <div className="h-0.5 w-16 bg-primary/30 mt-5 rounded-full" />
                           </div>
                         )}
                       </div>
@@ -501,15 +471,26 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
                       </div>
 
                       {/* Card Content */}
-                      <div className="flex-1 ml-4 glass-panel p-4 rounded-2xl border border-white/20 shadow-md">
+                      <div className="flex-1 ml-4 glass-panel p-5 rounded-2xl border border-white/20 shadow-md">
                         {imgUrl && (
                           <div className="rounded-2xl overflow-hidden mb-4 border border-white/10 shadow-sm">
-                            <img className="w-full h-64 object-cover" src={imgUrl} alt={ch.title} />
+                            <img className="w-full h-56 object-cover" src={imgUrl} alt={ch.title} loading="lazy" />
                           </div>
                         )}
-                        <h3 className="font-h2 text-h3 text-primary mb-1 font-bold">{ch.title || `Khoảnh khắc ${idx + 1}`}</h3>
-                        <p className="font-body-md text-body-md text-on-surface-variant italic leading-relaxed">{ch.content}</p>
-                        <div className="h-px w-12 bg-primary/20 mt-3" />
+                        <div className="inline-block px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider mb-1.5 border border-primary/15">
+                          Khoảnh khắc {idx + 1}
+                        </div>
+                        <h3 className="font-h2 text-lg text-primary mb-2 font-bold tracking-tight">
+                          {ch.title || `Khoảnh khắc ${idx + 1}`}
+                        </h3>
+                        <div
+                          className={`font-body-md text-sm leading-relaxed whitespace-pre-line break-words ${
+                            isDark ? 'text-slate-200' : 'text-slate-700'
+                          }`}
+                        >
+                          {ch.content}
+                        </div>
+                        <div className="h-0.5 w-12 bg-primary/30 mt-4 rounded-full" />
                       </div>
                     </div>
                   </RevealSection>
@@ -525,7 +506,7 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
               {/* Sticky left panel showing the main hero or first photo */}
               <div className="lg:sticky lg:top-24 space-y-6">
-                <div className="rounded-[2.5rem] overflow-hidden dreamy-shadow border border-white/10 relative">
+                <div className="rounded-[2.5rem] overflow-hidden dreamy-shadow border border-white/10 relative shadow-xl">
                   {hasCover && images.length > 0 ? (
                     <img className="w-full aspect-video lg:aspect-[4/5] object-cover" src={images[0]} alt="Hero Memory" />
                   ) : (
@@ -557,10 +538,10 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
                       <p className="relative z-10 font-handwriting text-2xl mt-8 text-primary font-bold">Kỷ niệm ngọt ngào</p>
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-6 md:p-8 text-left">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent flex items-end p-6 md:p-8 text-left">
                     <div className="text-white space-y-2">
-                      <h2 className="font-display text-h2 font-bold leading-tight">{title}</h2>
-                      <p className="font-body-lg text-white/80 font-handwriting text-xl">Kỷ niệm cùng thương yêu</p>
+                      <h2 className="font-display text-2xl md:text-3xl font-bold leading-tight">{title}</h2>
+                      <p className="font-body-lg text-white/90 font-handwriting text-xl">Kỷ niệm cùng thương yêu</p>
                     </div>
                   </div>
                 </div>
@@ -571,12 +552,23 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
                 {storyChapters.map((ch, idx) => {
                   const imgUrl = chapterImages[idx] || '';
                   return (
-                    <RevealSection key={idx} className="glass-panel p-5 md:p-8 rounded-[2rem] border border-white/20 shadow-md hover:shadow-lg transition-shadow">
-                      <h3 className="font-h2 text-h2 text-primary mb-4 font-bold">{ch.title || `Chương ${idx + 1}`}</h3>
-                      <p className="font-body-lg text-body-lg text-on-surface-variant italic mb-6 leading-relaxed">{ch.content}</p>
+                    <RevealSection key={idx} className="glass-panel p-6 md:p-8 rounded-[2rem] border border-white/20 shadow-md hover:shadow-lg transition-shadow">
+                      <div className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider mb-3 border border-primary/15">
+                        Chương {idx + 1}
+                      </div>
+                      <h3 className="font-h2 text-xl md:text-2xl text-primary mb-3 font-bold tracking-tight">
+                        {ch.title || `Chương ${idx + 1}`}
+                      </h3>
+                      <div
+                        className={`font-body-lg text-base md:text-lg leading-relaxed md:leading-loose whitespace-pre-line break-words mb-4 ${
+                          isDark ? 'text-slate-200' : 'text-slate-700'
+                        }`}
+                      >
+                        {ch.content}
+                      </div>
                       {imgUrl && (
                         <div className="rounded-2xl overflow-hidden border border-white/10 shadow-sm mt-4">
-                          <img className="w-full aspect-video object-cover" src={imgUrl} alt={ch.title} />
+                          <img className="w-full aspect-video object-cover" src={imgUrl} alt={ch.title} loading="lazy" />
                         </div>
                       )}
                     </RevealSection>
@@ -602,13 +594,13 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
                 <SunflowerDuck size={80} className="sm:w-[120px] sm:h-[120px] w-[70px] h-[70px]" />
               </div>
 
-              <div className="space-y-6">
-                <p className="font-handwriting text-3xl md:text-4xl font-bold" style={{ color: 'var(--theme-primary)' }}>
+              <div className="space-y-4 sm:space-y-6">
+                <p className="font-handwriting text-2xl sm:text-3xl md:text-4xl font-bold" style={{ color: 'var(--theme-primary)' }}>
                   {galleryLayout === 'cosmic' 
                     ? 'Khoảnh khắc trong vũ trụ của chúng ta ✨' 
                     : 'Góc album kỷ niệm yêu thương 🖼️'}
                 </p>
-                <p className={isDark ? 'text-white/60 font-caption text-caption' : 'text-on-surface-variant font-caption text-caption'}>
+                <p className={isDark ? 'text-white/60 font-caption text-xs sm:text-sm' : 'text-on-surface-variant font-caption text-xs sm:text-sm'}>
                   {galleryLayout === 'cosmic'
                     ? 'Mỗi bức ảnh là một hành tinh chứa đầy kỷ niệm'
                     : 'Lưu giữ những khoảnh khắc ấm áp cùng nhau'}
@@ -616,15 +608,15 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
                 <button
                   type="button"
                   onClick={() => navigate(`/page/${page.slug}/gallery`)}
-                  className={`inline-flex items-center gap-2 px-8 py-4 rounded-full backdrop-blur-md border transition-all font-label-caps text-label-caps tracking-wider uppercase cursor-pointer ${
+                  className={`inline-flex items-center gap-2 px-6 py-3 sm:px-8 sm:py-3.5 rounded-full backdrop-blur-md border transition-all font-label-caps text-xs sm:text-sm tracking-wider uppercase cursor-pointer active:scale-95 shadow-md ${
                     isDark
                       ? 'bg-white/10 border-white/20 text-white hover:bg-white/20'
                       : 'bg-primary/10 border-primary/20 text-primary hover:bg-primary/20'
                   }`}
                 >
-                  <span className="material-symbols-outlined">auto_stories</span>
+                  <span className="material-symbols-outlined text-base sm:text-lg">auto_stories</span>
                   <span>{galleryLayout === 'cosmic' ? 'Khám phá vũ trụ' : 'Mở Album ảnh'}</span>
-                  <span className="material-symbols-outlined">arrow_forward</span>
+                  <span className="material-symbols-outlined text-base sm:text-lg">arrow_forward</span>
                 </button>
               </div>
 
@@ -639,67 +631,25 @@ export const LovePageView: React.FC<LovePageViewProps> = ({ page }) => {
         {/* Link to Letter Page if no gallery images */}
         {galleryImages.length === 0 && (
           <section className="py-4xl px-6 text-center">
-            <div className="max-w-2xl mx-auto space-y-6">
-              <p className="font-handwriting text-3xl md:text-4xl font-bold text-primary">
+            <div className="max-w-2xl mx-auto space-y-4 sm:space-y-6">
+              <p className="font-handwriting text-2xl sm:text-3xl md:text-4xl font-bold text-primary">
                 {letterLabel}
               </p>
               <button
                 onClick={() => navigate(`/page/${page.slug}/letter`)}
-                className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-primary text-white hover:bg-primary/95 hover:scale-105 transition-all font-label-caps text-label-caps tracking-wider uppercase dreamy-shadow"
+                className="inline-flex items-center gap-2 px-6 py-3 sm:px-8 sm:py-3.5 rounded-full bg-primary text-white hover:bg-primary/95 hover:scale-105 transition-all font-label-caps text-xs sm:text-sm tracking-wider uppercase dreamy-shadow active:scale-95"
               >
-                <span className="material-symbols-outlined">mail</span>
+                <span className="material-symbols-outlined text-base sm:text-lg">mail</span>
                 <span>{page.recipientType === 'LOVER' || page.recipientType === 'SPOUSE' || !page.recipientType ? 'Đọc thư tình' : 'Đọc thư gửi đi'}</span>
-                <span className="material-symbols-outlined">arrow_forward</span>
+                <span className="material-symbols-outlined text-base sm:text-lg">arrow_forward</span>
               </button>
             </div>
           </section>
         )}
       </main>
 
-      {/* Floating Music Player */}
-      {music && (
-        <div className="fixed z-50 animate-fade-in" style={{ left: musicPos.x, bottom: musicPos.y }}>
-          {/* Collapsed: note icon only */}
-          {!musicExpanded && (
-            <div
-              onClick={handleNoteClick}
-              onMouseDown={handleMusicMouseDown}
-              onTouchStart={handleMusicTouchStart}
-              className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center hover:bg-white/20 transition-all cursor-grab active:cursor-grabbing relative overflow-hidden shadow-lg"
-            >
-              <div className={`absolute inset-0 bg-primary/20 rounded-full ${isPlaying ? 'animate-spin' : ''}`} style={{ animationDuration: '3s' }} />
-              <span className="material-symbols-outlined text-white text-xl relative z-10 pointer-events-none">music_note</span>
-            </div>
-          )}
-
-          {/* Expanded: full player */}
-          {musicExpanded && (
-            <div className={`${isDark ? 'bg-[#16213e]/90 backdrop-blur-md' : 'glass-panel'} dreamy-shadow rounded-full px-6 py-3 flex items-center justify-between gap-4 border border-white/10 relative overflow-hidden shadow-lg max-w-xs`}>
-              <div
-                onClick={handleNoteClick}
-                onMouseDown={handleMusicMouseDown}
-                onTouchStart={handleMusicTouchStart}
-                className="flex items-center gap-4 flex-1 min-w-0 cursor-grab active:cursor-grabbing"
-              >
-                <div className="w-10 h-10 rounded-full bg-primary-container/20 flex items-center justify-center relative overflow-hidden">
-                  <div className={`absolute inset-0 bg-primary/20 rounded-full ${isPlaying ? 'animate-spin' : ''}`} style={{ animationDuration: '3s' }} />
-                  <span className="material-symbols-outlined text-primary text-xl relative z-10 pointer-events-none">music_note</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-label-caps text-label-caps text-primary truncate font-semibold pointer-events-none">Nhạc nền</p>
-                  <p className="font-caption text-[10px] text-on-surface-variant truncate uppercase tracking-tighter pointer-events-none">Kỷ niệm của chúng ta</p>
-                </div>
-              </div>
-              <button onClick={handlePlayClick} className="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center hover:scale-105 transition-transform active:scale-95 flex-shrink-0">
-                <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>{isPlaying ? 'pause' : 'play_arrow'}</span>
-              </button>
-              <div className="h-1 absolute bottom-0 left-0 right-0 bg-primary/10 rounded-full overflow-hidden">
-                <div className="h-full bg-primary transition-all duration-200" style={{ width: `${audioProgress}%` }} />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Synchronized Floating Music Player */}
+      <FloatingMusicPlayer music={music} isDark={!!isDark} />
 
       {/* Footer */}
 
